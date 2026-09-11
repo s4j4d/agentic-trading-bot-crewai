@@ -1,0 +1,50 @@
+market_scout_task:
+  description: >
+    Scan the cryptocurrency market and produce a ranked shortlist of 3-7 coins
+    that represent the strongest short-term trading opportunities right now.
+
+    Run all four scouting tools in this order:
+    1. trending_coins (top_n=10) — identify coins with surging search interest.
+    2. momentum_screener (top_n=20, min_volume_usd=5000000, max_market_cap_rank=500)
+       — identify coins showing the strongest 24-hour price gains with real volume.
+    3. new_listings (top_n=20) — check for recently listed coins with early momentum.
+    4. upcoming_catalysts (limit=20) — find coins with imminent or recent bullish
+       catalysts (ETF filings, exchange listings, protocol upgrades, partnerships).
+
+    Apply the composite opportunity scoring model from your skill:
+    - Momentum: 40% weight (24h gain mapped 0–100)
+    - Trending rank: 30% weight (rank 1=100, rank 10=10)
+    - Catalyst net votes: 15% weight (capped at 100)
+    - New listing bonus: 15% weight
+
+    Exclude coins that match any of these conditions:
+    - Volume < $1M in 24h
+    - No live price data
+    - Any bearish catalyst flag (hack, exploit, lawsuit, ban, rug, delist)
+    - 24h gain > 30% with no identifiable catalyst
+    - Is a stablecoin (USDT, USDC, DAI, BUSD, TUSD) or wrapped asset (WBTC, WETH)
+
+    Return between 3 and 7 coins, ranked by opportunity score.
+
+  expected_output: >
+    A JSON array (and nothing else — no markdown, no prose) of opportunity objects,
+    sorted descending by score. Each object must have exactly these fields:
+
+    [
+      {
+        "rank": 1,
+        "coin_id": "<coingecko_slug>",
+        "symbol": "<UPPERCASE_TICKER>",
+        "name": "<full name>",
+        "score": <0-100 integer>,
+        "signals": ["<signal_1>", "<signal_2>", ...],
+        "risk_tier": "<LOW|MEDIUM|HIGH|EXTREME>",
+        "reason": "<one sentence explaining why this coin was selected>"
+      },
+      ...
+    ]
+
+    The coin_id field must be the exact CoinGecko slug (e.g. "bitcoin", "solana",
+    "the-sandbox") — this is used directly as the API key by downstream agents.
+
+  agent: market_scout

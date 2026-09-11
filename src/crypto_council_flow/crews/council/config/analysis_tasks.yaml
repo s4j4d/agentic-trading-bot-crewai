@@ -1,0 +1,145 @@
+technical_analysis_task:
+  description: >
+    Perform a comprehensive technical analysis of {symbol} (CoinGecko ID: {coin_id})
+    priced in {vs_currency}.
+
+    Use your tools in this order:
+    1. RSI ({period}-period) to assess momentum and overbought/oversold levels.
+    2. MACD (12/26/9) to identify momentum crossovers.
+    3. Bollinger Bands (20-period, 2σ) to assess volatility regime and price position.
+    4. EMA Cross (9/21) to confirm short-term trend direction.
+    5. ATR (14-period) to quantify recent volatility and compute stop distances.
+
+    Synthesise all five indicators into a structured report covering:
+    - Primary trend (bullish / bearish / sideways)
+    - Momentum state (accelerating / decelerating / reversing)
+    - Volatility regime (squeeze / expansion / normalised)
+    - Key support level and key resistance level (derived from Bollinger midline,
+      EMAs, and recent price extremes from the data)
+    - Directional bias with confidence level (high / medium / low)
+    - Suggested entry zone and invalidation level (1× ATR below/above entry)
+
+  expected_output: >
+    A structured technical analysis report in the following format:
+
+    ## Technical Analysis: {symbol}/{vs_currency}
+    **Trend:** [bullish|bearish|sideways]
+    **Momentum (RSI {period}):** [value] — [overbought|oversold|neutral]
+    **MACD Signal:** [crossover_signal]
+    **Bollinger Position:** [position] | Band Width: [band_width_pct]%
+    **EMA Cross (9/21):** [crossover] — [trend]
+    **ATR (14):** [atr] ([atr_pct]%) — [volatility_level]
+    **Key Support:** [value]
+    **Key Resistance:** [value]
+    **Bias:** [bullish|bearish|neutral] (confidence: [high|medium|low])
+    **Entry Zone:** [range]
+    **Invalidation Level:** [value]
+    **Summary:** [2-3 sentence narrative]
+
+  agent: technical_analyst
+
+sentiment_analysis_task:
+  description: >
+    Conduct a full sentiment sweep for {symbol} (CoinGecko ID: {coin_id}) to
+    determine whether market psychology currently supports or undermines a trade.
+
+    Execute the following in order:
+    1. Fear & Greed Index (7-day history) — identify the current reading and trend.
+    2. Crypto news sentiment — fetch the top 10 hot news items for the symbol's
+       ticker (use the uppercase ticker, e.g. BTC for bitcoin) and assess the
+       bullish/bearish vote distribution and dominant narrative themes.
+    3. Community sentiment — fetch Reddit subscribers, Twitter followers, dev
+       commits, and CoinGecko sentiment vote ratio for the coin_id.
+    4. Market dominance — get BTC dominance and total market cap change to
+       place the asset in macro context.
+
+    Compute a composite sentiment score from 0 (extreme fear / bearish) to
+    100 (extreme greed / bullish) and identify any sentiment-price divergences.
+
+  expected_output: >
+    A structured sentiment report in the following format:
+
+    ## Sentiment Analysis: {symbol}
+    **Composite Sentiment Score:** [0-100] — [label]
+    **Fear & Greed Index:** [value] ([classification]) | 7-day trend: [trend]
+    **News Sentiment:** [aggregate_sentiment] | Bullish votes: [n] / Bearish votes: [n]
+    **Top Narrative Themes:** [bullet list of 3-5 themes from headlines]
+    **Community Health:** Twitter [n] followers | Reddit [n] subscribers | Dev commits 4w: [n]
+    **Market Regime:** BTC dominance [pct]% — [regime]
+    **Sentiment-Price Divergence:** [yes/no — explanation if yes]
+    **Catalyst Flags:** [list any unusual news or extreme readings]
+    **Summary:** [2-3 sentence narrative combining all signals]
+
+  agent: sentiment_analyst
+  context:
+    - technical_analysis_task
+
+risk_assessment_task:
+  description: >
+    You have received technical and sentiment analyses for {symbol}
+    (CoinGecko ID: {coin_id}).
+    Now produce a complete risk-adjusted trade plan for the following parameters:
+    - Account size: {account_size_usd} USD
+    - Directional bias: take it from the technical analysis output
+    - Entry price: use the entry zone midpoint from the technical analysis
+    - Stop-loss: use the invalidation level from the technical analysis
+    - Reward/risk ratio target: 2:1 minimum
+
+    Execute the following risk tools:
+    1. Position Sizing — compute Kelly and fixed-risk position sizes using a
+       win_rate of 0.55 and max_risk_pct of 2.0 for standard scenario,
+       and max_risk_pct of 1.0 for conservative scenario.
+    2. Liquidation Price — calculate for both 2x and 5x leverage scenarios
+       (long or short depending on bias). Use maintenance_margin_rate of 0.005.
+    3. Portfolio VaR — run historical VaR and CVaR for {coin_id} at 95% confidence
+       with a position size matching the recommended standard position.
+    4. Asset Correlation — if the portfolio already holds BTC and the coin_id is
+       not "bitcoin", check correlation between {coin_id} and bitcoin over 90 days.
+
+    Combine all risk metrics with the technical bias and sentiment score to
+    produce the final trade recommendation.
+
+  expected_output: >
+    A structured risk management report in the following format:
+
+    ## Risk Assessment: {symbol} Trade Plan
+    **Account Size:** ${account_size_usd}
+    **Directional Bias:** [long|short] (from technical analysis)
+    **Sentiment Alignment:** [aligned|misaligned|neutral] with technical bias
+
+    ### Conservative Scenario (1% account risk)
+    - Position Size: [units] {symbol} (~$[usd])
+    - Entry: $[price]
+    - Stop-Loss: $[price] ([pct]% from entry)
+    - Take-Profit 1 (1:1 R/R): $[price]
+    - Take-Profit 2 (2:1 R/R): $[price]
+    - Risk: $[usd] ([pct]% of account)
+
+    ### Standard Scenario (2% account risk)
+    - Position Size: [units] {symbol} (~$[usd])
+    - Entry: $[price]
+    - Stop-Loss: $[price] ([pct]% from entry)
+    - Take-Profit 1 (1:1 R/R): $[price]
+    - Take-Profit 2 (2:1 R/R): $[price]
+    - Risk: $[usd] ([pct]% of account)
+
+    ### Leverage Warning (if applicable)
+    - 2x Liquidation Price: $[price] ([pct]% from entry) — Risk: [level]
+    - 5x Liquidation Price: $[price] ([pct]% from entry) — Risk: [level]
+    - Maximum Recommended Leverage: [n]x
+
+    ### Portfolio Risk Metrics
+    - 1-Day VaR (95%): [pct]% / $[usd]
+    - 1-Day CVaR (95%): [pct]% / $[usd]
+    - Annualised Volatility: [pct]%
+    - BTC Correlation (90d): [value] — [relationship]
+
+    ### Final Recommendation
+    **Execute Trade:** [YES|NO|CONDITIONAL]
+    **Conditions:** [any conditions for entry, e.g. wait for RSI to exit overbought]
+    **Summary:** [3-5 sentence executive summary]
+
+  agent: risk_manager
+  context:
+    - technical_analysis_task
+    - sentiment_analysis_task
