@@ -287,9 +287,10 @@ class CouncilScoutCrew:
             verbose=cfg.get("verbose", True),
             allow_delegation=cfg.get("allow_delegation", False),
             reasoning=False,
-            max_iter=15,
+            max_iter=8,
             max_retry_limit=2,
-            max_rpm=1
+            max_rpm=1,
+            max_execution_time=300
         )
 
     @task

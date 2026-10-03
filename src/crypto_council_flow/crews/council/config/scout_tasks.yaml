@@ -1,6 +1,6 @@
 market_scout_task:
   description: >
-    Scan the cryptocurrency market and produce a ranked shortlist of 3-7 coins
+    Scan the cryptocurrency market and produce a ranked shortlist of 3 coins
     that represent strong short-term trading opportunities right now.
 
     The primary objective is HIGH, TRADABLE SHORT-TERM VOLATILITY combined
@@ -28,18 +28,18 @@ market_scout_task:
        whether a candidate is tradeable. Do NOT analyse the sample list.
        Confirm each finalist with exchange_ticker.
 
-    1. trending_coins (top_n=10)
+    1. trending_coins (top_n=5)
        Identify coins receiving unusually high market attention.
        Use this as an attention signal, not as a volatility measurement.
 
     2. momentum_screener
-       (top_n=20, min_volume_usd=5000000, max_market_cap_rank=500)
+       (top_n=10, min_volume_usd=5000000, max_market_cap_rank=500)
        Identify liquid coins with strong recent momentum across multiple
        timeframes. Use this for momentum and volume, not as the primary
        volatility measurement.
 
     3. volatility_screener
-       (top_n=20, min_volume_usd=1000000, max_market_cap_rank=500)
+       (top_n=10, min_volume_usd=1000000, max_market_cap_rank=500)
        This is the PRIMARY volatility source.
        Prioritize:
        - recent realized volatility
@@ -47,12 +47,12 @@ market_scout_task:
        - frequency of significant hourly price movements
        - sufficient trading volume
 
-    4. new_listings (top_n=20)
+    4. new_listings (top_n=10)
        Identify newer market entries that may experience elevated volatility
        and active price discovery. Require adequate liquidity before selection.
        Do not assume id ordering is an exact listing-date ranking.
 
-    5. exchange_ticker (one call per top candidate, max 5)
+    5. exchange_ticker (one call per top candidate, max 3)
        Confirm live price and 24h change on the exchange for your leading
        candidates. Drop candidates with no exchange ticker.
 
@@ -120,7 +120,7 @@ market_scout_task:
     output is the JSON object below — never a question, summary, or
     explanation. If any tool errors, skip it and continue with the rest.
 
-    Return between 3 and 7 candidates. Rank them by overall opportunity score.
+    Return exactly 3 candidates. Rank them by overall opportunity score.
 
   expected_output: >
     A JSON object and nothing else, with a single key "opportunities"

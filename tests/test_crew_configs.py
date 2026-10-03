@@ -67,3 +67,16 @@ def test_analysis_and_portfolio_crews_have_time_budgets() -> None:
     (pm,) = CouncilPortfolioCrew().crew().agents
     assert getattr(pm, "max_execution_time") == 300
     assert getattr(pm, "max_iter") == 5
+
+
+def test_scout_crew_has_time_budget_and_narrowed_prompt() -> None:
+    """Plan Task 3: scout shrunk to 3 finalists with a 5-min budget."""
+    from crypto_council_flow.crews.council.council_crew import CouncilScoutCrew
+
+    crew = CouncilScoutCrew().crew()
+    (scout,) = crew.agents
+    assert getattr(scout, "max_iter") == 8
+    assert getattr(scout, "max_execution_time") == 300
+    (t,) = [t for t in crew.tasks if t.name == "market_scout_task"]
+    assert "3-7" not in t.description
+    assert "max 3" in t.description
