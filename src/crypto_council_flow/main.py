@@ -12,8 +12,17 @@ The flow implements two nested loops inside a single long-running process:
 
   Analysis loop  (every 5 minutes, operates on the current scout list)
     For each coin in the scout list, CouncilAnalysisCrew runs the three-agent
-    sequential pipeline (technical → sentiment → risk) and writes a report to
-    output/<coin_id>_report.md.
+      sequential pipeline (technical → sentiment → risk) and writes a report to
+      output/<coin_id>_report.md.  All results are also appended to a single
+      consolidated file at output/all_analysis_results.txt.
+
+Cycle locking
+-------------
+No new cycle (scout or analysis) starts while any previous cycle is still
+running. A single asyncio.Lock prevents overlapping execution: if the scout
+cycle is in progress when the analysis timer fires, the analysis is skipped
+and retried on the next scheduler tick (and vice-versa). This ensures mutual
+exclusion between all cycles regardless of type.
 
 Flow state is a Pydantic model so it is typed and serialisable.
 
@@ -30,18 +39,23 @@ import asyncio
 import json
 import sys
 import os
+import time
 os.environ["OTEL_SDK_DISABLED"] = "true"
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from crewai.flow import Flow, listen, start
 
 from crypto_council_flow.crews.council.council_crew import (
     CouncilAnalysisCrew,
+    CouncilPortfolioCrew,
     CouncilScoutCrew,
+    PortfolioAction,
+    PortfolioPlan,
 )
 
 # ---------------------------------------------------------------------------
@@ -51,8 +65,10 @@ from crypto_council_flow.crews.council.council_crew import (
 SCOUT_INTERVAL_SECONDS: int = 2 * 60 * 60   # 2 hours
 ANALYSIS_INTERVAL_SECONDS: int = 5 * 60     # 5 minutes
 DEFAULT_VS_CURRENCY: str = "usd"
+DEFAULT_BASE_CURRENCY: str = "usd"
 DEFAULT_RSI_PERIOD: int = 14
 OUTPUT_DIR: Path = Path("output")
+CONSOLIDATED_RESULTS: Path = OUTPUT_DIR / "all_analysis_results.txt"
 
 
 # ---------------------------------------------------------------------------
@@ -60,24 +76,74 @@ OUTPUT_DIR: Path = Path("output")
 # ---------------------------------------------------------------------------
 
 class CoinOpportunity(BaseModel):
-    """A single coin opportunity as returned by the market_scout."""
+    """Single canonical DTO for scout output consumed by the Flow.
 
-    rank: int
-    coin_id: str
-    symbol: str
-    name: str
-    score: int
+    Same shape as ScoutOpportunity in council_crew.py — one DTO, never two.
+    The before-validator normalises LLM field-name variants so structured
+    output and the raw-JSON fallback both converge on this shape.
+    """
+    rank: int = 0
+    coin_id: str = ""
+    symbol: str = ""
+    name: str = ""
+    score: int = 50
     signals: list[str] = Field(default_factory=list)
     risk_tier: str = "MEDIUM"
     reason: str = ""
+
+    model_config = {"extra": "ignore"}
+
+    @model_validator(mode="before")
+    @classmethod
+    def _normalise_aliases(cls, data: object) -> object:
+        if not isinstance(data, dict):
+            return data
+        d = dict(data)
+
+        if not d.get("coin_id") and d.get("coingecko_id"):
+            d["coin_id"] = d["coingecko_id"]
+
+        if not d.get("symbol"):
+            if d.get("ticker"):
+                d["symbol"] = d["ticker"]
+            elif isinstance(d.get("coin"), str) and "(" in d["coin"]:
+                inside = d["coin"].split("(")[-1].rstrip(")").strip()
+                if inside.isalpha() and len(inside) <= 6:
+                    d["symbol"] = inside.upper()
+
+        if not d.get("name") and isinstance(d.get("coin"), str):
+            d["name"] = d["coin"].split("(")[0].strip() or d["coin"]
+
+        if d.get("score") is None and d.get("weighted_score") is not None:
+            raw = d["weighted_score"]
+            try:
+                raw = float(raw)
+                d["score"] = int(round(raw * 100)) if 0 <= raw <= 1 else int(round(raw))
+            except (TypeError, ValueError):
+                d["score"] = 50
+
+        if d.get("rank") is None and d.get("rank_position") is not None:
+            d["rank"] = d["rank_position"]
+
+        # coin_id fallback — derive a slug from the symbol
+        if not d.get("coin_id"):
+            sym = (d.get("symbol") or "").upper()
+            d["coin_id"] = {"BTC": "bitcoin", "ETH": "ethereum", "SOL": "solana"}.get(sym, (d.get("symbol") or "").lower().replace(" ", "-"))
+
+        return d
 
 
 class CryptoCouncilState(BaseModel):
     """Persistent Flow state passed between steps."""
 
     # User-configurable inputs (supplied at kickoff)
-    account_size_usd: float = 10_000.0
+    account_size: float = 10_000.0
+    base_currency: str = DEFAULT_BASE_CURRENCY
     period: int = DEFAULT_RSI_PERIOD
+
+    # Configurable caps (also supplied at kickoff or via CLI)
+    max_total_exposure_pct: float = 60.0
+    max_single_position_pct: float = 20.0
 
     # Scout outputs — refreshed every 2 hours
     coin_opportunities: list[CoinOpportunity] = Field(default_factory=list)
@@ -86,10 +152,70 @@ class CryptoCouncilState(BaseModel):
     # Analysis tracking — refreshed every 5 minutes
     last_analysis_utc: str = ""
     analysis_reports: dict[str, str] = Field(default_factory=dict)  # coin_id → report path
+    analysed_coins: list[str] = Field(default_factory=list)  # coin_ids with completed analysis this cycle
+
+    # Portfolio management — refreshed after each analysis cycle
+    portfolio_plan: dict[str, Any] = Field(default_factory=dict)  # last PortfolioPlan dump
+    last_portfolio_utc: str = ""
 
     # Internal timing state
     scout_cycle: int = 0
     analysis_cycle: int = 0
+    portfolio_cycle: int = 0
+
+    # Per-cycle durations (seconds, wall-clock)
+    last_scout_duration_s: float = 0.0
+    last_analysis_duration_s: float = 0.0
+    last_portfolio_duration_s: float = 0.0
+    last_coin_durations_s: dict[str, float] = Field(default_factory=dict)  # coin_id → seconds
+
+
+def _analyse_one_coin(
+    opportunity: CoinOpportunity, period: int, account_size: float, base_currency: str
+) -> tuple[CoinOpportunity, str | None, Exception | None, float]:
+    """Run the analysis crew for one coin (worker thread).
+
+    Pure worker: never touches flow state or the filesystem. Returns
+    (opportunity, raw_report_or_None, error_or_None, duration_s) so the
+    main thread can do all state mutation and file writes.
+    """
+    coin_start = time.perf_counter()
+    try:
+        result = CouncilAnalysisCrew().crew().kickoff(
+            inputs={
+                "symbol": opportunity.symbol,
+                "coin_id": opportunity.coin_id,
+                "vs_currency": DEFAULT_VS_CURRENCY,
+                "period": period,
+                "account_size": account_size,
+                "base_currency": base_currency,
+            }
+        )
+        return (opportunity, result.raw, None, time.perf_counter() - coin_start)
+    except Exception as exc:  # noqa: BLE001 — surfaced to the merge loop
+        return (opportunity, None, exc, time.perf_counter() - coin_start)
+
+
+def _analysis_workers(n_coins: int) -> int:
+    """Thread-pool size for per-coin analysis (env-overridable)."""
+    try:
+        workers = int(os.getenv("COUNCIL_ANALYSIS_WORKERS", "3"))
+    except ValueError:
+        workers = 3
+    return max(1, min(n_coins, workers))
+
+
+def _fmt_dur(seconds: float) -> str:
+    """Format seconds as '45s', '1m 23s', or '1h 02m'."""
+    seconds = max(0.0, float(seconds))
+    if seconds < 60:
+        return f"{seconds:.0f}s"
+    if seconds < 3600:
+        m, s = divmod(int(seconds), 60)
+        return f"{m}m {s:02d}s"
+    h, rem = divmod(int(seconds), 3600)
+    m = rem // 60
+    return f"{h}h {m:02d}m"
 
 
 # ---------------------------------------------------------------------------
@@ -98,10 +224,11 @@ class CryptoCouncilState(BaseModel):
 
 class CryptoCouncilFlow(Flow[CryptoCouncilState]):
     """
-    Two-step CrewAI Flow:
+    Three-step CrewAI Flow:
 
-      run_scout     — market_scout produces a ranked coin list
-      analyse_coins — three analysts process each coin sequentially
+      run_scout       — market_scout produces a ranked coin list
+      analyse_coins   — three analysts process each coin sequentially
+      manage_portfolio — portfolio_manager reconciles the book with fresh signals
     """
 
     @start()
@@ -111,6 +238,7 @@ class CryptoCouncilFlow(Flow[CryptoCouncilState]):
         Called once at startup and then every 2 hours by the outer scheduler.
         """
         self.state.scout_cycle += 1
+        scout_start = time.perf_counter()
         print(
             f"\n{'='*60}\n"
             f"SCOUT CYCLE #{self.state.scout_cycle}  "
@@ -118,48 +246,46 @@ class CryptoCouncilFlow(Flow[CryptoCouncilState]):
             f"{'='*60}"
         )
 
-        result = CouncilScoutCrew().crew().kickoff()
-        raw_output = result.raw.strip()
-
-        # Parse the JSON array from the scout output
-        opportunities: list[CoinOpportunity] = []
         try:
-            # Strip markdown code fences if the LLM wrapped the JSON
-            if raw_output.startswith("```"):
-                raw_output = "\n".join(
-                    line for line in raw_output.splitlines()
-                    if not line.strip().startswith("```")
-                )
-            data: list[dict[str, Any]] = json.loads(raw_output)
-            for item in data:
-                try:
-                    opportunities.append(CoinOpportunity(**item))
-                except Exception:
-                    # Skip malformed entries rather than crashing
-                    pass
-        except json.JSONDecodeError:
-            # LLM didn't return pure JSON — try to extract the array
-            import re
-            match = re.search(r"\[.*\]", raw_output, re.DOTALL)
-            if match:
-                try:
-                    data = json.loads(match.group(0))
-                    for item in data:
-                        try:
-                            opportunities.append(CoinOpportunity(**item))
-                        except Exception:
-                            pass
-                except json.JSONDecodeError:
-                    pass
+            result = CouncilScoutCrew().crew().kickoff()
+        except Exception as exc:
+            self.state.last_scout_duration_s = time.perf_counter() - scout_start
+            print(f"ERROR: Scout crew failed: {exc}. Keeping previous coin list.")
+            print(f"⏱ Scout took {_fmt_dur(self.state.last_scout_duration_s)} (failed)")
+            return
+
+        # Preferred path: structured output validated by CrewAI against
+        # ScoutShortlist (no JSON parsing, no file roundtrip).
+        opportunities: list[CoinOpportunity] = []
+        shortlist = result.pydantic
+        items: list[dict[str, Any]] = []
+        if shortlist is not None:
+            raw_items = shortlist.opportunities
+            items = [
+                op.model_dump() if hasattr(op, "model_dump") else dict(op)
+                for op in raw_items
+            ]
+        else:
+            items = _extract_scout_items(result.raw)
+
+        for item in items:
+            try:
+                opportunities.append(CoinOpportunity(**item))
+            except Exception:
+                # Skip malformed entries rather than crashing
+                pass
 
         if not opportunities:
+            self.state.last_scout_duration_s = time.perf_counter() - scout_start
             print(
                 "WARNING: Scout returned no parseable opportunities. "
                 "Keeping previous coin list."
             )
+            print(f"⏱ Scout took {_fmt_dur(self.state.last_scout_duration_s)} (no results)")
         else:
             self.state.coin_opportunities = opportunities
             self.state.last_scout_utc = datetime.now(timezone.utc).isoformat()
+            self.state.last_scout_duration_s = time.perf_counter() - scout_start
             print(
                 f"Scout found {len(opportunities)} opportunity(ies):\n"
                 + "\n".join(
@@ -167,71 +293,362 @@ class CryptoCouncilFlow(Flow[CryptoCouncilState]):
                     for op in opportunities
                 )
             )
+            print(f"⏱ Scout took {_fmt_dur(self.state.last_scout_duration_s)}")
 
     @listen(run_scout)
     def analyse_coins(self) -> None:
         """
-        Run CouncilAnalysisCrew for each coin in the current opportunity list.
+        Run CouncilAnalysisCrew for each coin in the current opportunity list
+        PLUS any coins currently in the portfolio (open positions from previous plan).
         Called immediately after run_scout and then every 5 minutes by the scheduler.
         """
-        if not self.state.coin_opportunities:
+        if not self.state.coin_opportunities and not self.state.portfolio_plan:
             print("No coins to analyse. Waiting for scout results.")
             return
 
         self.state.analysis_cycle += 1
+        self.state.analysed_coins = []  # reset; manage_portfolio consumes this cycle's list
+        self.state.last_coin_durations_s = {}
+        analysis_start = time.perf_counter()
         OUTPUT_DIR.mkdir(exist_ok=True)
+
+        # Collect all coin_ids to analyse: scout opportunities + portfolio positions
+        to_analyse: list[CoinOpportunity] = list(self.state.coin_opportunities)
+
+        # Add portfolio coins that aren't already in scout list
+        if self.state.portfolio_plan and isinstance(self.state.portfolio_plan.get("actions"), list):
+            for action in self.state.portfolio_plan["actions"]:
+                if action.get("target", 0) > 0:
+                    coin_id = action.get("coin_id", "")
+                    if coin_id and not any(op.coin_id == coin_id for op in to_analyse):
+                        # Create a minimal opportunity for portfolio coin (score 0, will be vetted)
+                        to_analyse.append(
+                            CoinOpportunity(
+                                coin_id=coin_id,
+                                symbol=action.get("symbol", "").upper() or coin_id.upper(),
+                                name=action.get("symbol", "").upper() or coin_id.upper(),
+                                score=0,
+                                signals=["portfolio_hold"],
+                                risk_tier="MEDIUM",
+                                reason="Portfolio position — ensure fresh analysis for rebalance",
+                            )
+                        )
 
         print(
             f"\n{'-'*60}\n"
             f"ANALYSIS CYCLE #{self.state.analysis_cycle}  "
             f"{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}\n"
-            f"Analysing {len(self.state.coin_opportunities)} coin(s)...\n"
+            f"Analysing {len(to_analyse)} coin(s) (scout: {len(self.state.coin_opportunities)} + portfolio: {len(to_analyse) - len(self.state.coin_opportunities)})...\n"
             f"{'-'*60}"
         )
 
-        for opportunity in self.state.coin_opportunities:
+        failed_coins: list[str] = []
+        for opportunity in to_analyse:
+            print(f"\n  ▶ Queued {opportunity.symbol} ({opportunity.coin_id})...")
+
+        # Parallel fan-out: workers run the LLM crews; the main thread below
+        # does ALL state mutation and file writes (no shared-state races).
+        with ThreadPoolExecutor(max_workers=_analysis_workers(len(to_analyse))) as pool:
+            futures = [
+                pool.submit(
+                    _analyse_one_coin,
+                    opportunity,
+                    self.state.period,
+                    self.state.account_size,
+                    self.state.base_currency,
+                )
+                for opportunity in to_analyse
+            ]
+            worker_results = [fut.result() for fut in futures]
+
+        # Merge on the main thread, in scout-score order for stable output.
+        worker_results.sort(key=lambda r: getattr(r[0], "score", 0), reverse=True)
+        for opportunity, raw_report, error, duration_s in worker_results:
             coin_id = opportunity.coin_id
             symbol = opportunity.symbol
+            self.state.last_coin_durations_s[coin_id] = duration_s
 
-            print(f"\n  ▶ Analysing {symbol} ({coin_id})...")
+            if error is not None or raw_report is None:
+                failed_coins.append(coin_id)
+                print(f"    ✗ Analysis failed for {symbol}: {error}")
+                continue
 
-            try:
-                result = CouncilAnalysisCrew().crew().kickoff(
-                    inputs={
-                        "symbol": symbol,
-                        "coin_id": coin_id,
-                        "vs_currency": DEFAULT_VS_CURRENCY,
-                        "period": self.state.period,
-                        "account_size_usd": self.state.account_size_usd,
-                    }
-                )
+            report_path = OUTPUT_DIR / f"{coin_id}_report.md"
+            report_content = _build_report(
+                opportunity, raw_report,
+                duration_s=duration_s,
+            )
+            report_path.write_text(report_content, encoding="utf-8")
+            self.state.analysis_reports[coin_id] = str(report_path)
+            self.state.analysed_coins.append(coin_id)
+            print(
+                f"    ✓ Report saved → {report_path} "
+                f"(⏱ {_fmt_dur(duration_s)})"
+            )
 
-                report_path = OUTPUT_DIR / f"{coin_id}_report.md"
-                report_content = _build_report(opportunity, result.raw)
-                report_path.write_text(report_content, encoding="utf-8")
-                self.state.analysis_reports[coin_id] = str(report_path)
-                print(f"    ✓ Report saved → {report_path}")
-
-            except Exception as exc:
-                print(f"    ✗ Analysis failed for {symbol}: {exc}")
+            # Append to consolidated results file
+            _append_to_consolidated(
+                self.state.analysis_cycle, opportunity, raw_report,
+                duration_s=duration_s,
+            )
 
         self.state.last_analysis_utc = datetime.now(timezone.utc).isoformat()
+        self.state.last_analysis_duration_s = time.perf_counter() - analysis_start
         print(
-            f"\nAnalysis cycle #{self.state.analysis_cycle} complete. "
+            f"\nAnalysis cycle #{self.state.analysis_cycle} complete "
+            f"(⏱ {_fmt_dur(self.state.last_analysis_duration_s)}). "
+            f"Analysed: {self.state.analysed_coins} | "
+            f"Failed: {failed_coins} | "
             f"Reports: {list(self.state.analysis_reports.keys())}"
         )
+        if self.state.last_coin_durations_s:
+            per_coin = ", ".join(
+                f"{coin} {_fmt_dur(d)}"
+                for coin, d in self.state.last_coin_durations_s.items()
+            )
+            print(f"Per-coin times: {per_coin}")
+        print(f"Consolidated results: {CONSOLIDATED_RESULTS.resolve()}")
+
+    @listen(analyse_coins)
+    def manage_portfolio(self) -> None:
+        """
+        Run CouncilPortfolioCrew to produce a cap-aware rebalance plan.
+        Called immediately after analyse_coins completes.
+
+        The opportunities sent to the allocator are the scout list MERGED
+        with current book holdings missing from it (neutral carry score 50,
+        judged on fresh analysis rather than auto-exited).
+        """
+        # Prepare open_positions from previous portfolio plan (or empty for first run)
+        open_positions: list[dict[str, Any]] = []
+        plan_symbols: dict[str, str] = {}
+        if self.state.portfolio_plan and isinstance(self.state.portfolio_plan.get("actions"), list):
+            for action in self.state.portfolio_plan["actions"]:
+                if action.get("target", 0) > 0:
+                    coin = action.get("coin_id", "")
+                    if coin:
+                        open_positions.append({
+                            "coin_id": coin,
+                            "position": action.get("target", 0),
+                        })
+                        if action.get("symbol"):
+                            plan_symbols[coin] = action.get("symbol", "")
+
+        if not self.state.coin_opportunities and not open_positions:
+            print(
+                "No opportunities to manage. Skipping portfolio step. "
+                f"(analysed this cycle: {self.state.analysed_coins} — "
+                "empty means every analysis failed or scout returned nothing)"
+            )
+            return
+
+        self.state.portfolio_cycle += 1
+        portfolio_start = time.perf_counter()
+        print(
+            f"\n{'~'*60}\n"
+            f"PORTFOLIO CYCLE #{self.state.portfolio_cycle}  "
+            f"{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}\n"
+            f"{'~'*60}"
+        )
+
+        # Prepare opportunities for the allocator: scout list MERGED with
+        # current book holdings that the scout dropped. Those get a neutral
+        # carry score (50) and the "portfolio_hold" marker so the manager
+        # judges them on their fresh analysis instead of auto-exiting them.
+        seen_ids = {op.coin_id for op in self.state.coin_opportunities}
+        opportunities_json: list[dict[str, Any]] = [
+            {
+                "coin_id": op.coin_id,
+                "symbol": op.symbol,
+                "score": op.score,
+                "risk_tier": op.risk_tier,
+                "reason": op.reason,
+            }
+            for op in self.state.coin_opportunities
+        ]
+        for pos in open_positions:
+            if pos["coin_id"] not in seen_ids:
+                opportunities_json.append({
+                    "coin_id": pos["coin_id"],
+                    "symbol": plan_symbols.get(pos["coin_id"], pos["coin_id"].upper()),
+                    "score": 50,
+                    "risk_tier": "MEDIUM",
+                    "reason": "Portfolio hold not in scout list — carried with neutral score, judged on fresh analysis.",
+                })
+
+        analysed_coins_json = self.state.analysed_coins.copy()
+
+        try:
+            result = CouncilPortfolioCrew().crew().kickoff(
+                inputs={
+                    "account_size": self.state.account_size,
+                    "base_currency": self.state.base_currency,
+                    "max_total_exposure_pct": self.state.max_total_exposure_pct,
+                    "max_single_position_pct": self.state.max_single_position_pct,
+                    "open_positions_json": json.dumps(open_positions),
+                    "opportunities_json": json.dumps(opportunities_json),
+                    "analysed_coins_json": json.dumps(analysed_coins_json),
+                }
+            )
+
+            plan = result.pydantic
+            if plan is not None:
+                self.state.portfolio_plan = plan.model_dump()
+            else:
+                self.state.portfolio_plan = _extract_portfolio_plan(result.raw)
+
+            # Deterministic totals: never trust the crew's arithmetic.
+            self.state.portfolio_plan = _recompute_portfolio_totals(
+                self.state.portfolio_plan, self.state.account_size
+            )
+
+            self.state.last_portfolio_utc = datetime.now(timezone.utc).isoformat()
+            self.state.last_portfolio_duration_s = time.perf_counter() - portfolio_start
+
+            OUTPUT_DIR.mkdir(exist_ok=True)
+            snapshot = {
+                "saved_utc": self.state.last_portfolio_utc,
+                "portfolio_cycle": self.state.portfolio_cycle,
+                "duration_s": round(self.state.last_portfolio_duration_s, 1),
+                "account_size": self.state.account_size,
+                "base_currency": self.state.base_currency,
+                "max_total_exposure_pct": self.state.max_total_exposure_pct,
+                "max_single_position_pct": self.state.max_single_position_pct,
+                "plan": self.state.portfolio_plan,
+                "opportunities": opportunities_json,
+                "analysed_coins": analysed_coins_json,
+            }
+            (OUTPUT_DIR / "portfolio_plan.json").write_text(
+                json.dumps(snapshot, ensure_ascii=False, indent=2), encoding="utf-8"
+            )
+            with (OUTPUT_DIR / "portfolio_history.jsonl").open("a", encoding="utf-8") as fh:
+                fh.write(json.dumps({
+                    "ts": self.state.last_portfolio_utc,
+                    "cycle": self.state.portfolio_cycle,
+                    "duration_s": round(self.state.last_portfolio_duration_s, 1),
+                    "account_size": self.state.account_size,
+                    "base_currency": self.state.base_currency,
+                    "total_target": self.state.portfolio_plan.get("total_target", 0.0),
+                    "total_exposure_pct": self.state.portfolio_plan.get("total_exposure_pct", 0.0),
+                    "cash_remaining": self.state.portfolio_plan.get("cash_remaining", 0.0),
+                    "n_positions": sum(
+                        1 for a in self.state.portfolio_plan.get("actions", [])
+                        if a.get("target", 0) > 0
+                    ),
+                }, ensure_ascii=False) + "\n")
+
+            total_target = self.state.portfolio_plan.get("total_target", 0.0)
+            total_pct = self.state.portfolio_plan.get("total_exposure_pct", 0.0)
+            cash = self.state.portfolio_plan.get("cash_remaining", 0.0)
+            actions = self.state.portfolio_plan.get("actions", [])
+            open_actions = [a for a in actions if a.get("target", 0) > 0]
+            currency = self.state.base_currency.upper()
+            print(
+                f"Portfolio plan: {len(open_actions)} open position(s), "
+                f"{total_target:,.0f} {currency} total ({total_pct:.1f}% exposure), "
+                f"{cash:,.0f} {currency} cash remaining"
+            )
+            for a in actions:
+                print(f"  {a.get('action','hold'):>8} {a.get('symbol','?'):>6} "
+                      f"{a.get('current',0):>8,.0f} → {a.get('target',0):>8,.0f} {currency}  ({a.get('reason','')})")
+            print(f"⏱ Portfolio took {_fmt_dur(self.state.last_portfolio_duration_s)}")
+
+        except Exception as exc:
+            self.state.last_portfolio_duration_s = time.perf_counter() - portfolio_start
+            print(f"ERROR: Portfolio crew failed: {exc}. Keeping previous plan.")
+            print(f"⏱ Portfolio took {_fmt_dur(self.state.last_portfolio_duration_s)} (failed)")
+            # Do not clear previous plan; just log the failure
+
+        # Reset analysed_coins for next cycle
+        self.state.analysed_coins = []
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _build_report(opportunity: CoinOpportunity, analysis_raw: str) -> str:
+def _extract_portfolio_plan(raw_output: str) -> dict[str, Any]:
+    """Best-effort extraction of portfolio plan dict from raw text."""
+    import re
+    text = raw_output.strip()
+    if text.startswith("```"):
+        text = "\n".join(
+            line for line in text.splitlines()
+            if not line.strip().startswith("```")
+        )
+    for pattern in (r'\{[^{}]*"actions"\s*:.*\}', r'\{.*"actions".*\}'):
+        match = re.search(pattern, text, re.DOTALL)
+        if not match:
+            continue
+        try:
+            parsed = json.loads(match.group(0))
+        except json.JSONDecodeError:
+            continue
+        if isinstance(parsed, dict) and "actions" in parsed:
+            return parsed
+    return {}
+
+
+def _recompute_portfolio_totals(plan: dict[str, Any], account_size: float) -> dict[str, Any]:
+    """Recompute totals deterministically from action targets.
+
+    The crew's arithmetic is unreliable (it has divided by the exposure
+    budget instead of the account size). Totals are pure math: sum the
+    action targets, divide by the account for exposure %, subtract from
+    the account for cash. Never trust the LLM's numbers.
+    """
+    actions = plan.get("actions", []) if isinstance(plan, dict) else []
+    total = 0.0
+    if isinstance(actions, list):
+        for a in actions:
+            if isinstance(a, dict):
+                try:
+                    total += max(0.0, float(a.get("target", 0) or 0))
+                except (TypeError, ValueError):
+                    continue
+    total = round(total, 2)
+    plan["total_target"] = total
+    plan["total_exposure_pct"] = round(total / account_size * 100, 2) if account_size > 0 else 0.0
+    plan["cash_remaining"] = round(account_size - total, 2)
+    return plan
+
+
+def _extract_scout_items(raw_output: str) -> list[dict[str, Any]]:
+    """Best-effort extraction of opportunity dicts from raw scout text.
+
+    Handles the {"opportunities": [...]} envelope, a bare [...] array,
+    and markdown code fences. Returns [] when nothing parses.
+    """
+    import re
+
+    text = raw_output.strip()
+    if text.startswith("```"):
+        text = "\n".join(
+            line for line in text.splitlines()
+            if not line.strip().startswith("```")
+        )
+    for pattern in (r'\{[^{}]*"opportunities"\s*:.*\}', r"\[.*\]"):
+        match = re.search(pattern, text, re.DOTALL)
+        if not match:
+            continue
+        try:
+            parsed = json.loads(match.group(0))
+        except json.JSONDecodeError:
+            continue
+        if isinstance(parsed, dict):
+            parsed = parsed.get("opportunities", [])
+        if isinstance(parsed, list) and all(isinstance(i, dict) for i in parsed):
+            return parsed
+    return []
+
+
+def _build_report(opportunity: CoinOpportunity, analysis_raw: str, duration_s: float = 0.0) -> str:
     """Wrap the crew's raw analysis output with a scout context header."""
     ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     header = (
         f"# Crypto Council Report: {opportunity.symbol}\n\n"
         f"**Generated:** {ts}  \n"
+        f"**Analysis time:** {_fmt_dur(duration_s)}  \n"
         f"**Scout Score:** {opportunity.score}/100 | "
         f"**Risk Tier:** {opportunity.risk_tier}  \n"
         f"**Scout Reason:** {opportunity.reason}  \n"
@@ -241,26 +658,59 @@ def _build_report(opportunity: CoinOpportunity, analysis_raw: str) -> str:
     return header + analysis_raw
 
 
+def _append_to_consolidated(
+    cycle: int, opportunity: CoinOpportunity, analysis_raw: str,
+    duration_s: float = 0.0,
+) -> None:
+    """Append a single coin's analysis to the consolidated results file."""
+    CONSOLIDATED_RESULTS.parent.mkdir(exist_ok=True)
+    ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    separator = "=" * 72
+
+    entry = (
+        f"\n{separator}\n"
+        f"  CYCLE #{cycle}  |  {ts}  |  ⏱ {_fmt_dur(duration_s)}\n"
+        f"  {opportunity.symbol} ({opportunity.coin_id})\n"
+        f"  Score: {opportunity.score}/100  |  Risk: {opportunity.risk_tier}\n"
+        f"  Signals: {', '.join(opportunity.signals) or '—'}\n"
+        f"  Reason: {opportunity.reason or '—'}\n"
+        f"{separator}\n\n"
+        f"{analysis_raw}\n"
+    )
+
+    with open(CONSOLIDATED_RESULTS, "a", encoding="utf-8") as fh:
+        fh.write(entry)
+
+
 def _parse_inputs(argv: list[str]) -> dict[str, Any]:
     """Parse CLI arguments into Flow inputs.
 
     Accepted flags:
-      --account-size <float>   account size in USD (default: 10000)
+      --account-size <float>   account size (default: 10000)
+      --base-currency <str>    currency label (default: usd, e.g. toman, eur)
       --period <int>           RSI period (default: 14)
+      --max-total-exposure <float>  max total invested % (default: 60)
+      --max-single-position <float> max single-coin % (default: 20)
       --once                   run one full cycle and exit
     """
     inputs: dict[str, Any] = {
-        "account_size_usd": 10_000.0,
+        "account_size": 10_000.0,
+        "base_currency": "usd",
         "period": DEFAULT_RSI_PERIOD,
+        "max_total_exposure_pct": 60.0,
+        "max_single_position_pct": 20.0,
     }
     i = 1
     while i < len(argv):
         arg = argv[i]
         if arg in ("--account-size", "--account_size") and i + 1 < len(argv):
             try:
-                inputs["account_size_usd"] = float(argv[i + 1])
+                inputs["account_size"] = float(argv[i + 1])
             except ValueError:
                 pass
+            i += 2
+        elif arg in ("--base-currency", "--base_currency") and i + 1 < len(argv):
+            inputs["base_currency"] = argv[i + 1].lower().strip()
             i += 2
         elif arg in ("--period",) and i + 1 < len(argv):
             try:
@@ -271,6 +721,18 @@ def _parse_inputs(argv: list[str]) -> dict[str, Any]:
         elif arg == "--once":
             inputs["_once"] = True
             i += 1
+        elif arg in ("--max-total-exposure", "--max_total_exposure") and i + 1 < len(argv):
+            try:
+                inputs["max_total_exposure_pct"] = float(argv[i + 1])
+            except ValueError:
+                pass
+            i += 2
+        elif arg in ("--max-single-position", "--max_single_position") and i + 1 < len(argv):
+            try:
+                inputs["max_single_position_pct"] = float(argv[i + 1])
+            except ValueError:
+                pass
+            i += 2
         else:
             i += 1
     return inputs
@@ -281,51 +743,94 @@ def _parse_inputs(argv: list[str]) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 async def _run_async(
-    account_size_usd: float,
+    account_size: float,
     period: int,
     run_once: bool = False,
+    max_total_exposure_pct: float = 60.0,
+    max_single_position_pct: float = 20.0,
+    base_currency: str = "usd",
 ) -> None:
     """
     Outer async scheduler.
 
     Scout cadence:   every SCOUT_INTERVAL_SECONDS (2 hours)
     Analysis cadence: every ANALYSIS_INTERVAL_SECONDS (5 minutes)
+    Portfolio step runs immediately after each analysis cycle.
 
     On the first iteration both scout and analysis run immediately.
     After that, the analysis loop runs every 5 minutes, and the scout
     refreshes its coin list every 2 hours.
+
+    Cycle locking: No new cycle (scout or analysis) starts if any
+    older cycle is still running. This prevents overlapping execution.
     """
     flow = CryptoCouncilFlow()
-    flow.state.account_size_usd = account_size_usd
+    flow.state.account_size = account_size
+    flow.state.base_currency = base_currency
     flow.state.period = period
+    flow.state.max_total_exposure_pct = max_total_exposure_pct
+    flow.state.max_single_position_pct = max_single_position_pct
 
     last_scout_time: float = 0.0        # force scout on first iteration
     last_analysis_time: float = 0.0     # force analysis on first iteration
-    print('######################',last_scout_time,"\n")
-    import time
+    run_started = time.perf_counter()
+
+    # Cycle locking: ensure no overlapping cycles
+    # A single lock prevents any new cycle from starting if any cycle is running
+    cycle_lock = asyncio.Lock()
 
     iteration = 0
     while True:
-        now = time.monotonic()
+        now = time.time()
         iteration += 1
 
         # --- Scout (every 2 hours) ---
-        if now - last_scout_time >= SCOUT_INTERVAL_SECONDS:
-            await asyncio.to_thread(flow.run_scout)
-            last_scout_time = time.monotonic()
+        if (now - last_scout_time >= SCOUT_INTERVAL_SECONDS):
+            if cycle_lock.locked():
+                print(f"[Scheduler] Scout cycle skipped: previous cycle still running")
+            else:
+                async with cycle_lock:
+                    try:
+                        await asyncio.to_thread(flow.run_scout)
+                    except Exception as exc:
+                        print(f"ERROR: Scout cycle failed: {exc}. Continuing.")
+                    last_scout_time = time.time()
 
         # --- Analysis (every 5 minutes) ---
-        if now - last_analysis_time >= ANALYSIS_INTERVAL_SECONDS:
-            await asyncio.to_thread(flow.analyse_coins)
-            last_analysis_time = time.monotonic()
+        if (now - last_analysis_time >= ANALYSIS_INTERVAL_SECONDS):
+            if cycle_lock.locked():
+                print(f"[Scheduler] Analysis cycle skipped: previous cycle still running")
+            else:
+                async with cycle_lock:
+                    try:
+                        await asyncio.to_thread(flow.analyse_coins)
+                        await asyncio.to_thread(flow.manage_portfolio)
+                    except Exception as exc:
+                        print(f"ERROR: Analysis cycle failed: {exc}. Continuing.")
+                    last_analysis_time = time.time()
 
         if run_once:
-            print("\nRan one full cycle (--once flag). Exiting.")
+            print(
+                f"\n{'='*60}\n"
+                f"CYCLE SUMMARY  (total wall-clock {_fmt_dur(time.perf_counter() - run_started)})\n"
+                f"  Scout:     {_fmt_dur(flow.state.last_scout_duration_s)}\n"
+                f"  Analysis:  {_fmt_dur(flow.state.last_analysis_duration_s)}"
+                + (
+                    f"  [{', '.join(f'{c} {_fmt_dur(d)}' for c, d in flow.state.last_coin_durations_s.items())}]"
+                    if flow.state.last_coin_durations_s else ""
+                ) + "\n"
+                f"  Portfolio: {_fmt_dur(flow.state.last_portfolio_duration_s)}\n"
+                f"{'='*60}"
+            )
+            print("Ran one full cycle (--once flag). Exiting.")
             break
 
         # Sleep for 60 s between scheduler ticks (granularity: 1 min)
         print(
-            f"\n[Scheduler] Cycle {iteration} done. "
+            f"\n[Scheduler] Cycle {iteration} done "
+            f"(scout {_fmt_dur(flow.state.last_scout_duration_s)} | "
+            f"analysis {_fmt_dur(flow.state.last_analysis_duration_s)} | "
+            f"portfolio {_fmt_dur(flow.state.last_portfolio_duration_s)}). "
             f"Next analysis check in ~60 s."
         )
         await asyncio.sleep(60)
@@ -341,9 +846,12 @@ def kickoff() -> None:
     run_once = inputs.pop("_once", False)
     asyncio.run(
         _run_async(
-            account_size_usd=inputs.get("account_size_usd", 10_000.0),
+            account_size=inputs.get("account_size", 10_000.0),
+            base_currency=inputs.get("base_currency", "usd"),
             period=inputs.get("period", DEFAULT_RSI_PERIOD),
             run_once=run_once,
+            max_total_exposure_pct=inputs.get("max_total_exposure_pct", 60.0),
+            max_single_position_pct=inputs.get("max_single_position_pct", 20.0),
         )
     )
 

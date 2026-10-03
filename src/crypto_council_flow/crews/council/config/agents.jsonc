@@ -30,10 +30,11 @@
       "significant time on a coin, so quality and precision of your shortlist "
       "directly determines the value of the whole council."
     ),
-    "verbose": true,
+    "verbose": false,
     "allow_delegation": false,
     // Reasoning enabled so the scout plans its scan before acting
-    "reasoning": true
+    "reasoning": true,
+    "max_reasoning_attempts":3
   },
 
   "technical_analyst": {
@@ -54,7 +55,7 @@
       "You present findings in a structured format: Trend → Momentum → Volatility → "
       "Key Levels → Bias."
     ),
-    "verbose": true,
+    "verbose": false,
     "allow_delegation": false,
     // Reasoning enabled so the agent plans its indicator sequence before acting
     "reasoning": true
@@ -78,7 +79,7 @@
       "You are immune to hype and FUD — you report what the data says, not what "
       "social media trends say."
     ),
-    "verbose": true,
+    "verbose": false,
     "allow_delegation": false,
     "reasoning": true
   },
@@ -101,7 +102,7 @@
       "conservative (0.5-1% account risk) and standard (1-2% account risk). "
       "Your output is the final word before any trade is executed."
     ),
-    "verbose": true,
+    "verbose": false,
     "allow_delegation": false,
     "reasoning": true
   }

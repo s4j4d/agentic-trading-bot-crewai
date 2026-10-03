@@ -134,23 +134,24 @@ class CryptoNewsTool(BaseTool):
 
     def _run(self, currencies: str = "BTC", filter_type: str = "hot", limit: int = 10) -> str:
         try:
-            params = {
-                "auth_token": "anonymous",  # Free anonymous access
-                "currencies": currencies,
-                "filter": filter_type,
-                "public": "true",
-            }
-            resp = requests.get(_CRYPTOPANIC_URL, params=params, timeout=_DEFAULT_TIMEOUT)
-
-            # CryptoPanic returns 200 even for anonymous; fallback gracefully
-            if resp.status_code == 403:
-                # Try without auth for truly public endpoint
-                params.pop("auth_token")
-                resp = requests.get(_CRYPTOPANIC_URL, params=params, timeout=_DEFAULT_TIMEOUT)
-
+            # Endpoint accepts only the apikey (embedded in URL), no query params.
+            resp = requests.get(_CRYPTOPANIC_URL, timeout=_DEFAULT_TIMEOUT)
             resp.raise_for_status()
             data = resp.json()
-            results = data.get("results", [])[:limit]
+            all_results = data.get("results", [])
+
+            # Client-side: filter by requested currencies and limit
+            if currencies:
+                wanted = {c.strip().upper() for c in currencies.split(",") if c.strip()}
+                all_results = [
+                    r for r in all_results
+                    if any(
+                        c.get("code", "").upper() in wanted
+                        for c in (r.get("currencies") or [])
+                    )
+                ]
+
+            results = all_results[:limit]
 
             if not results:
                 return json.dumps({

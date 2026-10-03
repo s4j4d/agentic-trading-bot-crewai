@@ -23,6 +23,26 @@ _DEFAULT_TIMEOUT = 20
 _COINGECKO_BASE = "https://api.coingecko.com/api/v3"
 _CRYPTOPANIC_URL = "https://newsdata.io/api/1/latest?apikey=pub_c111157bd75c4a9394c43bf276c0362a"
 
+# Per-run result cache — keyed by (tool_name, frozenset of sorted arg items).
+# Prevents re-calling a tool that already succeeded within one agent execution.
+# ponytail: no TTL; clear_tool_cache() resets between flow cycles.
+_tool_cache: dict[tuple[str, frozenset], str] = {}
+
+
+def clear_tool_cache() -> None:
+    """Reset between flow cycles."""
+    _tool_cache.clear()
+
+
+def _cache_get(name: str, kwargs: dict) -> str | None:
+    key = (name, frozenset(kwargs.items()))
+    return _tool_cache.get(key)
+
+
+def _cache_put(name: str, kwargs: dict, result: str) -> None:
+    if not result.startswith('{"error"'):
+        _tool_cache[(name, frozenset(kwargs.items()))] = result
+
 
 # ---------------------------------------------------------------------------
 # Trending Coins Tool
@@ -48,6 +68,9 @@ class TrendingCoinsTool(BaseTool):
     args_schema: Type[BaseModel] = TrendingCoinsInput
 
     def _run(self, top_n: int = 10) -> str:
+        cached = _cache_get(self.name, {"top_n": top_n})
+        if cached is not None:
+            return cached
         try:
             resp = requests.get(
                 f"{_COINGECKO_BASE}/search/trending",
@@ -70,7 +93,7 @@ class TrendingCoinsTool(BaseTool):
                     }
                 )
 
-            return json.dumps(
+            result = json.dumps(
                 {
                     "source": "coingecko_trending",
                     "timestamp_utc": datetime.now(timezone.utc).isoformat(),
@@ -78,6 +101,8 @@ class TrendingCoinsTool(BaseTool):
                     "coins": results,
                 }
             )
+            _cache_put(self.name, {"top_n": top_n}, result)
+            return result
         except requests.RequestException as exc:
             return json.dumps({"error": f"API request failed: {exc}"})
         except Exception as exc:
@@ -108,6 +133,9 @@ class NewListingsTool(BaseTool):
     args_schema: Type[BaseModel] = NewListingsInput
 
     def _run(self, top_n: int = 20) -> str:
+        cached = _cache_get(self.name, {"top_n": top_n})
+        if cached is not None:
+            return cached
         try:
             params = {
                 "vs_currency": "usd",
@@ -144,7 +172,7 @@ class NewListingsTool(BaseTool):
                     }
                 )
 
-            return json.dumps(
+            result = json.dumps(
                 {
                     "source": "coingecko_new_listings",
                     "timestamp_utc": datetime.now(timezone.utc).isoformat(),
@@ -152,6 +180,8 @@ class NewListingsTool(BaseTool):
                     "coins": results,
                 }
             )
+            _cache_put(self.name, {"top_n": top_n}, result)
+            return result
         except requests.RequestException as exc:
             return json.dumps({"error": f"API request failed: {exc}"})
         except Exception as exc:
@@ -198,6 +228,10 @@ class MomentumScreenerTool(BaseTool):
         min_volume_usd: float = 5_000_000.0,
         max_market_cap_rank: int = 500,
     ) -> str:
+        args = {"top_n": top_n, "min_volume_usd": min_volume_usd, "max_market_cap_rank": max_market_cap_rank}
+        cached = _cache_get(self.name, args)
+        if cached is not None:
+            return cached
         try:
             # Fetch top coins by market cap to stay within free-tier rate limits
             params = {
@@ -249,7 +283,7 @@ class MomentumScreenerTool(BaseTool):
             )
             top = candidates[:top_n]
 
-            return json.dumps(
+            result = json.dumps(
                 {
                     "source": "coingecko_momentum_screener",
                     "timestamp_utc": datetime.now(timezone.utc).isoformat(),
@@ -261,6 +295,8 @@ class MomentumScreenerTool(BaseTool):
                     "coins": top,
                 }
             )
+            _cache_put(self.name, args, result)
+            return result
         except requests.RequestException as exc:
             return json.dumps({"error": f"API request failed: {exc}"})
         except Exception as exc:
@@ -268,7 +304,7 @@ class MomentumScreenerTool(BaseTool):
 
 
 # ---------------------------------------------------------------------------
-# Upcoming Catalysts Tool  (CryptoPanic "important" + "rising" news scan)
+# Upcoming Catalysts Tool  (CryptoPanic news scan)
 # ---------------------------------------------------------------------------
 
 class UpcomingCatalystsInput(BaseModel):
@@ -304,25 +340,32 @@ class UpcomingCatalystsTool(BaseTool):
     ]
 
     def _run(self, limit: int = 20) -> str:
-        try:
-            items: list[dict] = []
-            for filter_type in ("important", "rising"):
-                params = {
-                    "auth_token": "anonymous",
-                    "filter": filter_type,
-                    "public": "true",
-                }
-                resp = requests.get(
-                    _CRYPTOPANIC_URL, params=params, timeout=_DEFAULT_TIMEOUT
-                )
-                if resp.status_code == 403:
-                    params.pop("auth_token", None)
-                    resp = requests.get(
-                        _CRYPTOPANIC_URL, params=params, timeout=_DEFAULT_TIMEOUT
-                    )
-                resp.raise_for_status()
-                items.extend(resp.json().get("results", []))
+        args = {"limit": limit}
+        cached = _cache_get(self.name, args)
+        if cached is not None:
+            return cached
 
+        # Outer try/except: any failure returns a valid empty result so the
+        # agent can continue with the other three tools.
+        try:
+            # Endpoint accepts only the apikey (embedded in URL), no query params.
+            resp = requests.get(_CRYPTOPANIC_URL, timeout=_DEFAULT_TIMEOUT)
+            resp.raise_for_status()
+            items: list[dict] = resp.json().get("results", [])
+        except Exception:
+            # API down, timeout, bad JSON, rate limit — return empty valid shape
+            # so the scout task does not crash.
+            return json.dumps(
+                {
+                    "source": "cryptopanic_catalyst_scan",
+                    "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+                    "articles_scanned": 0,
+                    "catalyst_articles_found": 0,
+                    "coins_with_catalysts": [],
+                }
+            )
+
+        try:
             # Deduplicate by URL
             seen: set[str] = set()
             unique: list[dict] = []
@@ -404,7 +447,7 @@ class UpcomingCatalystsTool(BaseTool):
             ]
             coin_summary.sort(key=lambda x: x["net_vote_score"], reverse=True)
 
-            return json.dumps(
+            result = json.dumps(
                 {
                     "source": "cryptopanic_catalyst_scan",
                     "timestamp_utc": datetime.now(timezone.utc).isoformat(),
@@ -413,7 +456,16 @@ class UpcomingCatalystsTool(BaseTool):
                     "coins_with_catalysts": coin_summary[:15],
                 }
             )
-        except requests.RequestException as exc:
-            return json.dumps({"error": f"API request failed: {exc}"})
-        except Exception as exc:
-            return json.dumps({"error": str(exc)})
+            _cache_put(self.name, args, result)
+            return result
+        except Exception:
+            # Processing error after successful fetch — return empty valid shape
+            return json.dumps(
+                {
+                    "source": "cryptopanic_catalyst_scan",
+                    "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+                    "articles_scanned": 0,
+                    "catalyst_articles_found": 0,
+                    "coins_with_catalysts": [],
+                }
+            )

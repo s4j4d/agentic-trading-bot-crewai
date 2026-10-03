@@ -35,6 +35,7 @@ from crewai import Agent, Crew, Process, Task
 from crewai.agents.agent_builder.base_agent import BaseAgent
 from crewai.project import CrewBase, agent, crew, task
 from crewai.skills.loader import load_skill
+from pydantic import BaseModel, Field
 
 from crypto_council_flow.tools.technical_indicators import (
     ATRTool,
@@ -139,6 +140,26 @@ def _risk_tools() -> list:
 
 
 # ---------------------------------------------------------------------------
+# Structured scout output — parsed by Flow from result.pydantic, no raw JSON
+# parsing and no file roundtrip (agent has no write_file tool).
+# ---------------------------------------------------------------------------
+
+class ScoutOpportunity(BaseModel):
+    rank: int
+    coin_id: str
+    symbol: str
+    name: str
+    score: int
+    signals: list[str] = Field(default_factory=list)
+    risk_tier: str = "MEDIUM"
+    reason: str = ""
+
+
+class ScoutShortlist(BaseModel):
+    opportunities: list[ScoutOpportunity] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
 # Scout Crew  (market_scout only)
 # ---------------------------------------------------------------------------
 
@@ -169,6 +190,7 @@ class CouncilScoutCrew:
     def market_scout_task(self) -> Task:
         return Task(
             config=self.tasks_config["market_scout_task"],  # type: ignore[index]
+            output_pydantic=ScoutShortlist,
         )
 
     @crew

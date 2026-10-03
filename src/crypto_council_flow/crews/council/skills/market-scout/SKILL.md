@@ -160,3 +160,10 @@ Risk tiers:
   agents use to query APIs. Do not use symbol alone.
 - Never select stablecoins (USDT, USDC, DAI, BUSD, TUSD) or wrapped assets (WBTC, WETH).
 - Flag HIGH and EXTREME risk tiers explicitly in the reason field.
+
+## ⚠️ No File-Writing Tools
+
+You have NO file-writing tools. Do NOT call write_file, create_file, save_file,
+or any similar tool — they do not exist and will fail. Return your ranked list
+directly as JSON in your final answer. The framework reads your final answer
+automatically; there is nothing to save.

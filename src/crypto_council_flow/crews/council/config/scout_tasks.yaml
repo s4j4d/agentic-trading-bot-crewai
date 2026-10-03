@@ -27,24 +27,15 @@ market_scout_task:
     Return between 3 and 7 coins, ranked by opportunity score.
 
   expected_output: >
-    A JSON array (and nothing else — no markdown, no prose) of opportunity objects,
-    sorted descending by score. Each object must have exactly these fields:
+    A JSON object (and nothing else — no markdown, no prose) with a single
+    key "opportunities" holding the ranked array, sorted descending by score.
+    Each object must have exactly these fields (score is an integer 0-100,
+    rank starts at 1):
 
-    [
-      {
-        "rank": 1,
-        "coin_id": "<coingecko_slug>",
-        "symbol": "<UPPERCASE_TICKER>",
-        "name": "<full name>",
-        "score": <0-100 integer>,
-        "signals": ["<signal_1>", "<signal_2>", ...],
-        "risk_tier": "<LOW|MEDIUM|HIGH|EXTREME>",
-        "reason": "<one sentence explaining why this coin was selected>"
-      },
-      ...
-    ]
+    {"opportunities": [{"rank": 1, "coin_id": "<coingecko_slug>", "symbol": "<UPPERCASE_TICKER>", "name": "<full name>", "score": <0-100 integer>, "signals": ["<signal_1>"], "risk_tier": "<LOW|MEDIUM|HIGH|EXTREME>", "reason": "<one sentence>"}]}
 
     The coin_id field must be the exact CoinGecko slug (e.g. "bitcoin", "solana",
     "the-sandbox") — this is used directly as the API key by downstream agents.
+    Do not call any file-writing tool: you have none. Return the JSON only.
 
   agent: market_scout
