@@ -63,6 +63,70 @@ def test_parallel_merge_keeps_all_coins(tmp_path, monkeypatch):
     assert (tmp_path / "output" / "all.txt").exists()
 
 
+def test_to_analyse_cap():
+    from crypto_council_flow.main import CoinOpportunity, CryptoCouncilFlow
+
+    f = CryptoCouncilFlow()
+    f.state.coin_opportunities = [
+        CoinOpportunity(coin_id=f"c{i}", symbol=f"C{i}", score=90 - i)
+        for i in range(10)
+    ]
+    f.state.max_coins = 3
+    assert len(f.state.coin_opportunities[: f.state.max_coins]) == 3
+
+
+def test_analyse_coins_respects_max_coins(tmp_path, monkeypatch):
+    """analyse_coins analyses at most max_coins, highest score first."""
+    _install_fake_crew(monkeypatch, tmp_path)
+    flow = _flow_with(*[f"coin-{i}" for i in range(5)])
+    # invert scores so the slice must sort, not just take the head
+    for i, op in enumerate(flow.state.coin_opportunities):
+        op.score = i * 10
+    flow.state.max_coins = 3
+
+    flow.analyse_coins()
+
+    assert sorted(flow.state.analysed_coins) == ["coin-2", "coin-3", "coin-4"]
+
+
+def test_analyse_coins_fast_skips_portfolio_extras(tmp_path, monkeypatch):
+    """Fast mode: portfolio holds outside the cap are not pulled in."""
+    _install_fake_crew(monkeypatch, tmp_path)
+    flow = _flow_with("coin-0", "coin-1", "coin-2")
+    flow.state.max_coins = 3
+    flow.state.fast = True
+    flow.state.portfolio_plan = {
+        "actions": [
+            {"coin_id": "coin-extra", "symbol": "EXTRA", "target": 500.0},
+        ]
+    }
+
+    flow.analyse_coins()
+
+    assert "coin-extra" not in flow.state.analysed_coins
+    assert len(flow.state.analysed_coins) == 3
+
+
+def test_analyse_coins_fills_portfolio_extras_within_cap(tmp_path, monkeypatch):
+    """Normal mode: portfolio holds fill spare slots up to the cap."""
+    _install_fake_crew(monkeypatch, tmp_path)
+    flow = _flow_with("coin-0", "coin-1")
+    flow.state.max_coins = 3
+    flow.state.fast = False
+    flow.state.portfolio_plan = {
+        "actions": [
+            {"coin_id": "coin-extra", "symbol": "EXTRA", "target": 500.0},
+            {"coin_id": "coin-overflow", "symbol": "OVER", "target": 500.0},
+        ]
+    }
+
+    flow.analyse_coins()
+
+    assert "coin-extra" in flow.state.analysed_coins
+    assert "coin-overflow" not in flow.state.analysed_coins
+    assert len(flow.state.analysed_coins) == 3
+
+
 def test_parallel_analysis_runs_concurrently(tmp_path, monkeypatch):
     """3 coins x 0.4s of work must finish well under serial time, on >1 thread."""
     calls = _install_fake_crew(monkeypatch, tmp_path, delay=0.4)

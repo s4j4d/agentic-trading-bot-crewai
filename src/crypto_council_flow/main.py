@@ -146,6 +146,10 @@ class CryptoCouncilState(BaseModel):
     max_total_exposure_pct: float = 60.0
     max_single_position_pct: float = 20.0
 
+    # Analysis scope (plan Task 2; CLI flags are Task 1)
+    max_coins: int = 10
+    fast: bool = False
+
     # Scout outputs — refreshed every 2 hours
     coin_opportunities: list[CoinOpportunity] = Field(default_factory=list)
     last_scout_utc: str = ""
@@ -314,27 +318,36 @@ class CryptoCouncilFlow(Flow[CryptoCouncilState]):
         analysis_start = time.perf_counter()
         OUTPUT_DIR.mkdir(exist_ok=True)
 
-        # Collect all coin_ids to analyse: scout opportunities + portfolio positions
-        to_analyse: list[CoinOpportunity] = list(self.state.coin_opportunities)
+        # Task 2 cap: sort scout by score desc, slice to max_coins, then
+        # fill spare slots with portfolio holds (normal mode only).
+        cap = max(1, self.state.max_coins or 10)
+        scout_sorted = sorted(
+            self.state.coin_opportunities, key=lambda o: o.score, reverse=True
+        )[:cap]
+        to_analyse: list[CoinOpportunity] = list(scout_sorted)
 
-        # Add portfolio coins that aren't already in scout list
-        if self.state.portfolio_plan and isinstance(self.state.portfolio_plan.get("actions"), list):
-            for action in self.state.portfolio_plan["actions"]:
-                if action.get("target", 0) > 0:
-                    coin_id = action.get("coin_id", "")
-                    if coin_id and not any(op.coin_id == coin_id for op in to_analyse):
-                        # Create a minimal opportunity for portfolio coin (score 0, will be vetted)
-                        to_analyse.append(
-                            CoinOpportunity(
-                                coin_id=coin_id,
-                                symbol=action.get("symbol", "").upper() or coin_id.upper(),
-                                name=action.get("symbol", "").upper() or coin_id.upper(),
-                                score=0,
-                                signals=["portfolio_hold"],
-                                risk_tier="MEDIUM",
-                                reason="Portfolio position — ensure fresh analysis for rebalance",
+        # Add portfolio coins that aren't already in scout list — only while
+        # slots remain. Fast mode skips extras entirely (cap is all scout).
+        if not getattr(self.state, "fast", False):
+            if self.state.portfolio_plan and isinstance(self.state.portfolio_plan.get("actions"), list):
+                for action in self.state.portfolio_plan["actions"]:
+                    if len(to_analyse) >= cap:
+                        break
+                    if action.get("target", 0) > 0:
+                        coin_id = action.get("coin_id", "")
+                        if coin_id and not any(op.coin_id == coin_id for op in to_analyse):
+                            # Create a minimal opportunity for portfolio coin (score 0, will be vetted)
+                            to_analyse.append(
+                                CoinOpportunity(
+                                    coin_id=coin_id,
+                                    symbol=action.get("symbol", "").upper() or coin_id.upper(),
+                                    name=action.get("symbol", "").upper() or coin_id.upper(),
+                                    score=0,
+                                    signals=["portfolio_hold"],
+                                    risk_tier="MEDIUM",
+                                    reason="Portfolio position — ensure fresh analysis for rebalance",
+                                )
                             )
-                        )
 
         print(
             f"\n{'-'*60}\n"
