@@ -27,6 +27,7 @@ Each agent has a SKILL.md file in skills/<agent-name>/ loaded at INSTRUCTIONS le
 from __future__ import annotations
 
 import json
+import os
 import re
 from pathlib import Path
 from typing import Any
@@ -104,6 +105,11 @@ memory = Memory(
     query_analysis_threshold=1000,
     storage="./memory"
 )
+
+# Task 6: gate CrewAI memory behind env var (default off — generic
+# conversation memory adds Ollama embed latency on every agent step with
+# no trading value; real-trading memory is Task 9 trade journal).
+_USE_MEMORY = os.getenv("COUNCIL_MEMORY", "false").lower() == "true"
 
 _CONFIG_DIR = Path(__file__).parent / "config"
 _SKILLS_DIR = Path(__file__).parent / "skills"
@@ -310,9 +316,9 @@ class CouncilScoutCrew:
             agents=self.agents,
             tasks=self.tasks,
             process=Process.sequential,
-            memory=memory,
+            memory=memory if _USE_MEMORY else None,
             verbose=True,
-            embedder=embedder
+            embedder=embedder if _USE_MEMORY else None,
         )
 
 
@@ -413,8 +419,8 @@ class CouncilAnalysisCrew:
             tasks=self.tasks,
             process=Process.sequential,
             verbose=True,
-            memory=memory,
-            embedder=embedder
+            memory=memory if _USE_MEMORY else None,
+            embedder=embedder if _USE_MEMORY else None,
         )
 
 
@@ -579,7 +585,7 @@ class CouncilPortfolioCrew:
             agents=self.agents,
             tasks=self.tasks,
             process=Process.sequential,
-            memory=memory,
+            memory=memory if _USE_MEMORY else None,
             verbose=True,
-            embedder=embedder
+            embedder=embedder if _USE_MEMORY else None,
         )
