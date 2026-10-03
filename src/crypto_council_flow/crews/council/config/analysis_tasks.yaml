@@ -79,17 +79,18 @@ risk_assessment_task:
     You have received technical and sentiment analyses for {symbol}
     (CoinGecko ID: {coin_id}).
     Now produce a complete risk-adjusted trade plan for the following parameters:
-    - Account size: {account_size_usd} USD
-    - Directional bias: take it from the technical analysis output
-    - Entry price: use the entry zone midpoint from the technical analysis
-    - Stop-loss: use the invalidation level from the technical analysis
-    - Reward/risk ratio target: 2:1 minimum
+        - Account size: {account_size} {base_currency}
+        - Directional bias: take it from the technical analysis output
+        - Entry price: use the entry zone midpoint from the technical analysis
+        - Stop-loss: use the invalidation level from the technical analysis
+        - Reward/risk ratio target: 2:1 minimum
 
     Execute the following risk tools:
     1. Position Sizing — compute Kelly and fixed-risk position sizes using a
        win_rate of 0.55 and max_risk_pct of 2.0 for standard scenario,
        and max_risk_pct of 1.0 for conservative scenario.
-    2. Liquidation Price — calculate for both 2x and 5x leverage scenarios
+    2. Liquidation Price — calculate for both 2x and 5x leverage scenarios in a
+       single call (pass leverage_levels: [2, 5]) for the trade direction
        (long or short depending on bias). Use maintenance_margin_rate of 0.005.
     3. Portfolio VaR — run historical VaR and CVaR for {coin_id} at 95% confidence
        with a position size matching the recommended standard position.
@@ -100,44 +101,44 @@ risk_assessment_task:
     produce the final trade recommendation.
 
   expected_output: >
-    A structured risk management report in the following format:
+      A structured risk management report in the following format:
 
-    ## Risk Assessment: {symbol} Trade Plan
-    **Account Size:** ${account_size_usd}
-    **Directional Bias:** [long|short] (from technical analysis)
-    **Sentiment Alignment:** [aligned|misaligned|neutral] with technical bias
+      ## Risk Assessment: {symbol} Trade Plan
+      **Account Size:** {account_size} {base_currency}
+      **Directional Bias:** [long|short] (from technical analysis)
+      **Sentiment Alignment:** [aligned|misaligned|neutral] with technical bias
 
-    ### Conservative Scenario (1% account risk)
-    - Position Size: [units] {symbol} (~$[usd])
-    - Entry: $[price]
-    - Stop-Loss: $[price] ([pct]% from entry)
-    - Take-Profit 1 (1:1 R/R): $[price]
-    - Take-Profit 2 (2:1 R/R): $[price]
-    - Risk: $[usd] ([pct]% of account)
+      ### Conservative Scenario (1% account risk)
+      - Position Size: [units] {symbol} (~{account_size} {base_currency})
+      - Entry: [price] {base_currency}
+      - Stop-Loss: [price] {base_currency} ([pct]% from entry)
+      - Take-Profit 1 (1:1 R/R): [price] {base_currency}
+      - Take-Profit 2 (2:1 R/R): [price] {base_currency}
+      - Risk: [amount] {base_currency} ([pct]% of account)
 
-    ### Standard Scenario (2% account risk)
-    - Position Size: [units] {symbol} (~$[usd])
-    - Entry: $[price]
-    - Stop-Loss: $[price] ([pct]% from entry)
-    - Take-Profit 1 (1:1 R/R): $[price]
-    - Take-Profit 2 (2:1 R/R): $[price]
-    - Risk: $[usd] ([pct]% of account)
+      ### Standard Scenario (2% account risk)
+      - Position Size: [units] {symbol} (~{account_size} {base_currency})
+      - Entry: [price] {base_currency}
+      - Stop-Loss: [price] {base_currency} ([pct]% from entry)
+      - Take-Profit 1 (1:1 R/R): [price] {base_currency}
+      - Take-Profit 2 (2:1 R/R): [price] {base_currency}
+      - Risk: [amount] {base_currency} ([pct]% of account)
 
-    ### Leverage Warning (if applicable)
-    - 2x Liquidation Price: $[price] ([pct]% from entry) — Risk: [level]
-    - 5x Liquidation Price: $[price] ([pct]% from entry) — Risk: [level]
-    - Maximum Recommended Leverage: [n]x
+      ### Leverage Warning (if applicable)
+      - 2x Liquidation Price: [price] {base_currency} ([pct]% from entry) — Risk: [level]
+      - 5x Liquidation Price: [price] {base_currency} ([pct]% from entry) — Risk: [level]
+      - Maximum Recommended Leverage: [n]x
 
-    ### Portfolio Risk Metrics
-    - 1-Day VaR (95%): [pct]% / $[usd]
-    - 1-Day CVaR (95%): [pct]% / $[usd]
-    - Annualised Volatility: [pct]%
-    - BTC Correlation (90d): [value] — [relationship]
+      ### Portfolio Risk Metrics
+      - 1-Day VaR (95%): [pct]% / [amount] {base_currency}
+      - 1-Day CVaR (95%): [pct]% / [amount] {base_currency}
+      - Annualised Volatility: [pct]%
+      - BTC Correlation (90d): [value] — [relationship]
 
-    ### Final Recommendation
-    **Execute Trade:** [YES|NO|CONDITIONAL]
-    **Conditions:** [any conditions for entry, e.g. wait for RSI to exit overbought]
-    **Summary:** [3-5 sentence executive summary]
+      ### Final Recommendation
+      **Execute Trade:** [YES|NO|CONDITIONAL]
+      **Conditions:** [any conditions for entry, e.g. wait for RSI to exit overbought]
+      **Summary:** [3-5 sentence executive summary]
 
   agent: risk_manager
   context:

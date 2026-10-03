@@ -1,0 +1,6 @@
+# Placeholder: agent definitions live in agents.jsonc (loaded manually by
+# council_crew.py via _load_jsonc into _AGENTS_DICT). This file exists only
+# so CrewBase's default agents_config path (config/agents.yaml) resolves
+# instead of logging "Agent config file not found ... empty agent
+# configurations". Do not add agents here.
+{}

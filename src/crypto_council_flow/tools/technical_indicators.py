@@ -2,40 +2,210 @@
 Technical analysis indicator tools for the technical_analyst agent.
 
 All indicators are computed from raw OHLCV data fetched from the
-CoinGecko public API (no API key required for basic endpoints).
+configured source (CoinGecko by default, or the configured exchange via
+USE_EXCHANGE_OHLC=true).
 """
 
 from __future__ import annotations
 
 import json
-from typing import Type
+import os
+import threading
+import time
+from typing import Any, Type
 
 import numpy as np
 import requests
 from crewai.tools import BaseTool
 from pydantic import BaseModel, Field
 
+from crypto_council_flow.tools.exchange_base import get_exchange_client
+
 
 _COINGECKO_BASE = "https://api.coingecko.com/api/v3"
-_DEFAULT_TIMEOUT = 15  # seconds
+_DEFAULT_TIMEOUT = 10  # seconds
 
 
 # ---------------------------------------------------------------------------
 # Shared helpers
 # ---------------------------------------------------------------------------
 
+_MIN_CANDLES = 50  # minimum candles we want for indicators to work reliably
+_USE_EXCHANGE = os.getenv("USE_EXCHANGE_OHLC", "false").lower() == "true"
+
+# In-memory OHLC cache: one fetch per (coin, vs, days) shared by all
+# indicator tools. Without this, a single coin analysis fires 5-7 identical
+# CoinGecko requests back-to-back and trips the free-tier rate limit (429).
+_OHLC_TTL_S = 15 * 60  # OHLC history barely moves within a cycle
+_ohlc_cache: dict[tuple[str, str, int, bool], tuple[float, list[list[float]]]] = {}
+_ohlc_lock = threading.Lock()
+_last_coingecko_call: float = 0.0
+_COINGECKO_MIN_GAP_S = 6.0  # ~10 req/min ceiling for the free tier
+
+
+def _throttled_get(url: str, params: dict[str, Any]) -> requests.Response:
+    """GET with a minimum gap between CoinGecko calls (rate-limit guard)."""
+    global _last_coingecko_call
+    with _ohlc_lock:
+        wait = _COINGECKO_MIN_GAP_S - (time.monotonic() - _last_coingecko_call)
+        if wait > 0:
+            time.sleep(wait)
+        resp = requests.get(url, params=params, timeout=_DEFAULT_TIMEOUT)
+        _last_coingecko_call = time.monotonic()
+    return resp
+
+
 def _fetch_ohlcv(coin_id: str, vs_currency: str, days: int) -> list[list[float]]:
     """Return OHLCV data as [[timestamp, open, high, low, close, volume], ...].
 
-    CoinGecko's /coins/{id}/ohlc endpoint returns:
-    [[timestamp_ms, open, high, low, close], ...]
-    We append volume from the market chart endpoint.
+    If USE_EXCHANGE_OHLC=true, uses the configured exchange client.
+    Otherwise falls back to CoinGecko.
+
+    Results are cached per (coin, vs, days, source) for _OHLC_TTL_S so the
+    5-7 indicator tools analysing one coin share a single fetch.
     """
+    key = (coin_id.lower(), vs_currency.lower(), days, _USE_EXCHANGE)
+    with _ohlc_lock:
+        hit = _ohlc_cache.get(key)
+        if hit and (time.monotonic() - hit[0]) < _OHLC_TTL_S:
+            return [list(row) for row in hit[1]]
+    data = _fetch_ohlcv_exchange(coin_id, vs_currency, days) if _USE_EXCHANGE else _fetch_ohlcv_coingecko(coin_id, vs_currency, days)
+    with _ohlc_lock:
+        _ohlc_cache[key] = (time.monotonic(), [list(row) for row in data])
+    return data
+
+
+def _fetch_ohlcv_coingecko(coin_id: str, vs_currency: str, days: int) -> list[list[float]]:
+    """Fetch OHLCV from CoinGecko."""
     ohlc_url = f"{_COINGECKO_BASE}/coins/{coin_id}/ohlc"
-    params = {"vs_currency": vs_currency, "days": days}
-    resp = requests.get(ohlc_url, params=params, timeout=_DEFAULT_TIMEOUT)
+    escalation = [days, 90, 180, 365, 730]
+
+    for attempt_days in escalation:
+        params = {"vs_currency": vs_currency, "days": attempt_days}
+        resp = _throttled_get(ohlc_url, params)
+        resp.raise_for_status()
+        candles = resp.json()  # [[ts, o, h, l, c], ...]
+        if len(candles) >= _MIN_CANDLES:
+            return [[c[0] * 1000, c[1], c[2], c[3], c[4], 0] for c in candles]
+
+    # Fallback: return whatever we got from the last attempt
+    params = {"vs_currency": vs_currency, "days": escalation[-1]}
+    resp = _throttled_get(ohlc_url, params)
     resp.raise_for_status()
-    return resp.json()  # [[ts, o, h, l, c], ...]
+    candles = resp.json()
+    return [[c[0] * 1000, c[1], c[2], c[3], c[4], 0] for c in candles]
+
+
+def _fetch_ohlcv_exchange(coin_id: str, vs_currency: str, days: int) -> list[list[float]]:
+    """Fetch OHLCV from the configured exchange."""
+    import time
+
+    client = get_exchange_client()
+
+    # Map CoinGecko coin_id to exchange symbol (e.g., bitcoin -> BTCUSDT)
+    symbol = _coingecko_id_to_symbol(coin_id, vs_currency)
+    if not symbol:
+        return []
+
+    to_ts = int(time.time())
+    from_ts = to_ts - days * 86400
+
+    # Use daily timeframe for indicator calculations
+    candles = client.get_ohlc(symbol, "1d", from_ts, to_ts)
+
+    # Ensure minimum candles
+    if len(candles) < _MIN_CANDLES and days < 730:
+        return _fetch_ohlcv_exchange(coin_id, vs_currency, min(days * 2, 730))
+
+    return candles
+
+
+def _coingecko_id_to_symbol(coin_id: str, vs_currency: str) -> str | None:
+    """Map CoinGecko ID to exchange symbol (e.g., bitcoin + usdt -> BTCUSDT)."""
+    # Common mappings - in production this would query the exchange's market list
+    common_map = {
+        "bitcoin": "BTC",
+        "ethereum": "ETH",
+        "solana": "SOL",
+        "ripple": "XRP",
+        "cardano": "ADA",
+        "dogecoin": "DOGE",
+        "avalanche-2": "AVAX",
+        "polkadot": "DOT",
+        "polygon": "MATIC",
+        "chainlink": "LINK",
+        "uniswap": "UNI",
+        "litecoin": "LTC",
+        "bitcoin-cash": "BCH",
+        "stellar": "XLM",
+        "cosmos": "ATOM",
+        "vechain": "VET",
+        "tron": "TRX",
+        "ethereum-classic": "ETC",
+        "filecoin": "FIL",
+        "internet-computer": "ICP",
+        "near": "NEAR",
+        "algorand": "ALGO",
+        "aave": "AAVE",
+        "maker": "MKR",
+        "compound": "COMP",
+        "sushi": "SUSHI",
+        "curve-dao-token": "CRV",
+        "yearn-finance": "YFI",
+        "synthetix": "SNX",
+        "1inch": "1INCH",
+        "decentraland": "MANA",
+        "the-sandbox": "SAND",
+        "axie-infinity": "AXS",
+        "flow": "FLOW",
+        "theta": "THETA",
+        "elrond": "EGLD",
+        "hedera": "HBAR",
+        "harmony": "ONE",
+        "kava": "KAVA",
+        "band-protocol": "BAND",
+        "ocean-protocol": "OCEAN",
+        "fetch-ai": "FET",
+        "render": "RNDR",
+        "arweave": "AR",
+        "helium": "HNT",
+        "kadena": "KDA",
+        "secret": "SCRT",
+        "thorchain": "RUNE",
+        "zcash": "ZEC",
+        "dash": "DASH",
+        "monero": "XMR",
+        "nano": "NANO",
+        "bitcoin-gold": "BTG",
+        "ravencoin": "RVN",
+        "digibyte": "DGB",
+        "horizen": "ZEN",
+        "siacoin": "SC",
+        "decred": "DCR",
+        "quant": "QNT",
+        "lido-dao": "LDO",
+        "rocket-pool": "RPL",
+        "staked-ether": "STETH",
+        "wrapped-bitcoin": "WBTC",
+        "tether": "USDT",
+        "usd-coin": "USDC",
+        "binance-usd": "BUSD",
+        "true-usd": "TUSD",
+        "dai": "DAI",
+        "frax": "FRAX",
+        "magic-internet-money": "MIM",
+        "liquity-usd": "LUSD",
+    }
+
+    base = common_map.get(coin_id.lower())
+    if not base:
+        # Fallback: use coin_id uppercased (works for simple symbols)
+        base = coin_id.upper().replace("-", "")
+        if len(base) > 6:
+            return None
+
+    quote = vs_currency.upper()
+    return f"{base}{quote}"
 
 
 def _closes(ohlcv: list[list[float]]) -> np.ndarray:
@@ -63,7 +233,7 @@ class RSIInput(BaseModel):
         ),
     )
     vs_currency: str = Field(default="usd", description="Quote currency (e.g. 'usd', 'btc').")
-    days: int = Field(default=30, ge=7, le=365, description="Number of days of OHLC history to fetch.")
+    days: int = Field(default=90, ge=30, le=730, description="Number of days of OHLC history to fetch.")
     period: int = Field(default=14, ge=2, le=50, description="RSI look-back period.")
 
 
@@ -77,7 +247,7 @@ class RSITool(BaseTool):
     )
     args_schema: Type[BaseModel] = RSIInput
 
-    def _run(self, coin_id: str, vs_currency: str = "usd", days: int = 30, period: int = 14) -> str:
+    def _run(self, coin_id: str, vs_currency: str = "usd", days: int = 90, period: int = 14) -> str:
         try:
             ohlcv = _fetch_ohlcv(coin_id, vs_currency, days)
             if len(ohlcv) < period + 1:

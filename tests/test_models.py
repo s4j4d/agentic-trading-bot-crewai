@@ -38,9 +38,10 @@ class TestCoinOpportunity:
         assert op.risk_tier == "LOW"
         assert op.reason == "Strong top-20 setup."
 
-    def test_missing_required_field_raises(self):
-        with pytest.raises(ValidationError):
-            CoinOpportunity(rank=1, symbol="BTC", name="Bitcoin", score=90)  # missing coin_id
+    def test_missing_coin_id_derives_from_symbol(self):
+        # coin_id is derived from the symbol via the before-validator
+        op = CoinOpportunity(rank=1, symbol="BTC", name="Bitcoin", score=90)
+        assert op.coin_id == "bitcoin"
 
     def test_score_is_integer(self):
         op = CoinOpportunity(rank=1, coin_id="bitcoin", symbol="BTC", name="Bitcoin", score=50)
@@ -70,7 +71,8 @@ class TestCoinOpportunity:
 class TestCryptoCouncilState:
     def test_default_construction(self):
         state = CryptoCouncilState()
-        assert state.account_size_usd == 10_000.0
+        assert state.account_size == 10_000.0
+        assert state.base_currency == "usd"
         assert state.period == 14
         assert state.coin_opportunities == []
         assert state.last_scout_utc == ""
@@ -79,8 +81,12 @@ class TestCryptoCouncilState:
         assert state.analysis_cycle == 0
 
     def test_custom_account_size(self):
-        state = CryptoCouncilState(account_size_usd=25_000.0)
-        assert state.account_size_usd == 25_000.0
+        state = CryptoCouncilState(account_size=25_000.0)
+        assert state.account_size == 25_000.0
+
+    def test_custom_base_currency(self):
+        state = CryptoCouncilState(base_currency="toman")
+        assert state.base_currency == "toman"
 
     def test_coin_opportunities_list(self):
         op = CoinOpportunity(rank=1, coin_id="solana", symbol="SOL", name="Solana", score=80)

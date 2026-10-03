@@ -91,7 +91,7 @@ Risk level interpretation:
 Run `portfolio_var` with:
 - `confidence_level = 0.95`
 - `days = 90`
-- `position_size_usd` = dollar value of the **standard scenario** position
+- `position_size` = value of the **standard scenario** position in the base currency
 
 Report:
 - 1-Day VaR: maximum expected daily loss at 95% confidence
@@ -129,8 +129,8 @@ TP1 (1:1 R/R)     = Entry + (1 × Risk per unit) for longs
 TP2 (2:1 R/R)     = Entry + (2 × Risk per unit) for longs
                      Entry - (2 × Risk per unit) for shorts
 
-Conservative units = conservative_position_size_usd / Entry
-Standard units     = standard_position_size_usd / Entry
+Conservative units = conservative_position_size / Entry
+Standard units     = standard_position_size / Entry
 ```
 
 ---
@@ -179,8 +179,8 @@ Is there a technical bias (bullish or bearish)?
 Always structure your output in this order:
 
 1. **Account & Trade Parameters** (account size, entry, stop, bias, R/R)
-2. **Conservative Scenario** (units, position USD, risk USD, risk%)
-3. **Standard Scenario** (units, position USD, risk USD, risk%)
+2. **Conservative Scenario** (units, position size, risk amount, risk%)
+3. **Standard Scenario** (units, position size, risk amount, risk%)
 4. **Leverage Warning** (if applicable — 2x and 5x liquidation prices)
 5. **Portfolio Risk Metrics** (VaR, CVaR, annualised vol, correlation)
 6. **Final Recommendation** (EXECUTE / CONDITIONAL / NO TRADE)

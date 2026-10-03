@@ -1,16 +1,6 @@
-"""
-Market-scouting tools for the market_scout agent.
-
-All tools use free public APIs only:
-  - CoinGecko (trending, top gainers, new coins, market data)
-  - CryptoPanic (news headlines with vote counts)
-
-No API keys required.
-"""
-
-from __future__ import annotations
-
 import json
+import math
+import os
 from datetime import datetime, timezone
 from typing import Type
 
@@ -19,33 +9,64 @@ from crewai.tools import BaseTool
 from pydantic import BaseModel, Field
 
 
-_DEFAULT_TIMEOUT = 20
+_DEFAULT_TIMEOUT = 10
 _COINGECKO_BASE = "https://api.coingecko.com/api/v3"
-_CRYPTOPANIC_URL = "https://newsdata.io/api/1/latest?apikey=pub_c111157bd75c4a9394c43bf276c0362a"
 
-# Per-run result cache — keyed by (tool_name, frozenset of sorted arg items).
-# Prevents re-calling a tool that already succeeded within one agent execution.
-# ponytail: no TTL; clear_tool_cache() resets between flow cycles.
+# Put your NewsData key in an environment variable instead of the source code.
+_NEWSDATA_URL = "https://newsdata.io/api/1/latest"
+_NEWSDATA_API_KEY = os.getenv("NEWSDATA_API_KEY")
+
 _tool_cache: dict[tuple[str, frozenset], str] = {}
 
 
-def clear_tool_cache() -> None:
-    """Reset between flow cycles."""
-    _tool_cache.clear()
+def _cache_get(tool_name: str, params: dict) -> str | None:
+    return _tool_cache.get((tool_name, frozenset(params.items())))
 
 
-def _cache_get(name: str, kwargs: dict) -> str | None:
-    key = (name, frozenset(kwargs.items()))
-    return _tool_cache.get(key)
-
-
-def _cache_put(name: str, kwargs: dict, result: str) -> None:
+def _cache_put(tool_name: str, params: dict, result: str) -> None:
     if not result.startswith('{"error"'):
-        _tool_cache[(name, frozenset(kwargs.items()))] = result
+        _tool_cache[(tool_name, frozenset(params.items()))] = result
+
+
+def _error(message: str) -> str:
+    return json.dumps({
+        "error": message
+    })
+
+
+def _get_coingecko(endpoint: str, params: dict) -> dict | list:
+    response = requests.get(
+        f"{_COINGECKO_BASE}{endpoint}",
+        params=params,
+        timeout=_DEFAULT_TIMEOUT,
+        headers={
+            "accept": "application/json",
+            "user-agent": "market-scout/1.0",
+        },
+    )
+
+    response.raise_for_status()
+    return response.json()
+
+
+def _safe_float(value, default: float = 0.0) -> float:
+    try:
+        if value is None:
+            return default
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _log_return(previous: float, current: float) -> float | None:
+    if previous <= 0 or current <= 0:
+        return None
+
+    return math.log(current / previous)
 
 
 # ---------------------------------------------------------------------------
-# Trending Coins Tool
+# Trending Coins
 # ---------------------------------------------------------------------------
 
 class TrendingCoinsInput(BaseModel):
@@ -53,419 +74,892 @@ class TrendingCoinsInput(BaseModel):
         default=10,
         ge=1,
         le=15,
-        description="Number of trending coins to return (CoinGecko returns up to 15).",
+        description="Number of trending coins to return.",
     )
 
 
 class TrendingCoinsTool(BaseTool):
     name: str = "trending_coins"
     description: str = (
-        "Fetches the top trending cryptocurrencies on CoinGecko in the last 24 hours, "
-        "ranked by search volume. Returns the coin ID, symbol, market-cap rank, "
-        "price in BTC, and 24-hour price change. Use this to identify coins with "
-        "rising retail and investor interest."
+        "Find coins currently receiving unusually high market attention on "
+        "CoinGecko. This measures attention/trending activity, not volatility."
     )
     args_schema: Type[BaseModel] = TrendingCoinsInput
 
     def _run(self, top_n: int = 10) -> str:
-        cached = _cache_get(self.name, {"top_n": top_n})
-        if cached is not None:
+        params = {"top_n": top_n}
+
+        cached = _cache_get(self.name, params)
+        if cached:
             return cached
+
         try:
-            resp = requests.get(
-                f"{_COINGECKO_BASE}/search/trending",
-                timeout=_DEFAULT_TIMEOUT,
-            )
-            resp.raise_for_status()
-            coins = resp.json().get("coins", [])[:top_n]
+            data = _get_coingecko("/search/trending", {})
 
-            results = []
-            for entry in coins:
-                item = entry.get("item", {})
-                results.append(
-                    {
-                        "coin_id": item.get("id", ""),
-                        "symbol": item.get("symbol", "").upper(),
-                        "name": item.get("name", ""),
-                        "market_cap_rank": item.get("market_cap_rank"),
-                        "price_btc": item.get("price_btc"),
-                        "score": item.get("score"),  # CoinGecko trending rank (0 = #1)
-                    }
-                )
+            coins = []
 
-            result = json.dumps(
-                {
-                    "source": "coingecko_trending",
-                    "timestamp_utc": datetime.now(timezone.utc).isoformat(),
-                    "count": len(results),
-                    "coins": results,
-                }
-            )
-            _cache_put(self.name, {"top_n": top_n}, result)
+            for item in data.get("coins", [])[:top_n]:
+                coin = item.get("item", {})
+
+                # CoinGecko's score is zero-based:
+                # score 0 = rank 1
+                trending_rank = int(coin.get("score", 0)) + 1
+
+                coins.append({
+                    "coin_id": coin.get("id"),
+                    "symbol": (coin.get("symbol") or "").upper(),
+                    "name": coin.get("name"),
+                    "trending_rank": trending_rank,
+                    "market_cap_rank": coin.get("market_cap_rank"),
+                    "price_btc": _safe_float(coin.get("price_btc")),
+                })
+
+            result = json.dumps({
+                "source": "coingecko_trending",
+                "coins": coins,
+            })
+
+            _cache_put(self.name, params, result)
             return result
-        except requests.RequestException as exc:
-            return json.dumps({"error": f"API request failed: {exc}"})
+
         except Exception as exc:
-            return json.dumps({"error": str(exc)})
-
-
-# ---------------------------------------------------------------------------
-# New Listings Tool
-# ---------------------------------------------------------------------------
-
-class NewListingsInput(BaseModel):
-    top_n: int = Field(
-        default=20,
-        ge=5,
-        le=50,
-        description="Number of recently added coins to return.",
-    )
-
-
-class NewListingsTool(BaseTool):
-    name: str = "new_listings"
-    description: str = (
-        "Fetches the most recently listed coins on CoinGecko. New listings often "
-        "experience high short-term volatility and momentum. Returns the coin ID, "
-        "symbol, name, and date it was first added to CoinGecko. Filter out coins "
-        "with no price data (likely scams or illiquid tokens)."
-    )
-    args_schema: Type[BaseModel] = NewListingsInput
-
-    def _run(self, top_n: int = 20) -> str:
-        cached = _cache_get(self.name, {"top_n": top_n})
-        if cached is not None:
-            return cached
-        try:
-            params = {
-                "vs_currency": "usd",
-                "order": "id_desc",  # newest first by internal ID
-                "per_page": top_n,
-                "page": 1,
-                "price_change_percentage": "24h",
-                "sparkline": "false",
-            }
-            resp = requests.get(
-                f"{_COINGECKO_BASE}/coins/markets",
-                params=params,
-                timeout=_DEFAULT_TIMEOUT,
+            return _error(
+                f"trending_coins failed: {type(exc).__name__}: {exc}"
             )
-            resp.raise_for_status()
-            raw = resp.json()
-
-            results = []
-            for coin in raw:
-                market_cap = coin.get("market_cap") or 0
-                price = coin.get("current_price") or 0
-                if price <= 0:
-                    continue  # skip coins with no live price
-                results.append(
-                    {
-                        "coin_id": coin.get("id", ""),
-                        "symbol": (coin.get("symbol") or "").upper(),
-                        "name": coin.get("name", ""),
-                        "current_price_usd": price,
-                        "market_cap_usd": market_cap,
-                        "market_cap_rank": coin.get("market_cap_rank"),
-                        "price_change_24h_pct": coin.get("price_change_percentage_24h"),
-                        "volume_24h_usd": coin.get("total_volume"),
-                    }
-                )
-
-            result = json.dumps(
-                {
-                    "source": "coingecko_new_listings",
-                    "timestamp_utc": datetime.now(timezone.utc).isoformat(),
-                    "count": len(results),
-                    "coins": results,
-                }
-            )
-            _cache_put(self.name, {"top_n": top_n}, result)
-            return result
-        except requests.RequestException as exc:
-            return json.dumps({"error": f"API request failed: {exc}"})
-        except Exception as exc:
-            return json.dumps({"error": str(exc)})
 
 
 # ---------------------------------------------------------------------------
-# Momentum Screener Tool
+# Momentum Screener
 # ---------------------------------------------------------------------------
 
 class MomentumScreenerInput(BaseModel):
     top_n: int = Field(
         default=20,
-        ge=5,
-        le=100,
-        description="Number of top-gaining coins to return.",
+        ge=1,
+        le=50,
+        description="Maximum number of momentum candidates.",
     )
+
     min_volume_usd: float = Field(
-        default=5_000_000.0,
+        default=5_000_000,
         ge=0,
-        description="Minimum 24-hour volume in USD to filter out illiquid coins.",
+        description="Minimum 24h trading volume in USD.",
     )
+
     max_market_cap_rank: int = Field(
         default=500,
         ge=1,
-        le=2000,
-        description="Only consider coins within this market-cap rank (e.g. top 500).",
+        le=1000,
+        description="Maximum CoinGecko market-cap rank.",
     )
 
 
 class MomentumScreenerTool(BaseTool):
     name: str = "momentum_screener"
     description: str = (
-        "Screens the top cryptocurrencies by 24-hour price gain, filtered by minimum "
-        "volume and market-cap rank. Returns coins showing the strongest positive "
-        "short-term momentum. Use this to find breakout candidates and coins with "
-        "unusual volume spikes relative to their typical trading activity."
+        "Find liquid coins with significant recent price momentum and trading "
+        "activity. This is a momentum/volume signal, NOT a volatility measure."
     )
     args_schema: Type[BaseModel] = MomentumScreenerInput
 
     def _run(
         self,
         top_n: int = 20,
-        min_volume_usd: float = 5_000_000.0,
+        min_volume_usd: float = 5_000_000,
         max_market_cap_rank: int = 500,
     ) -> str:
-        args = {"top_n": top_n, "min_volume_usd": min_volume_usd, "max_market_cap_rank": max_market_cap_rank}
-        cached = _cache_get(self.name, args)
-        if cached is not None:
-            return cached
-        try:
-            # Fetch top coins by market cap to stay within free-tier rate limits
-            params = {
-                "vs_currency": "usd",
-                "order": "market_cap_desc",
-                "per_page": max_market_cap_rank,
-                "page": 1,
-                "price_change_percentage": "1h,24h,7d",
-                "sparkline": "false",
-            }
-            resp = requests.get(
-                f"{_COINGECKO_BASE}/coins/markets",
-                params=params,
-                timeout=_DEFAULT_TIMEOUT,
-            )
-            resp.raise_for_status()
-            raw = resp.json()
 
-            # Filter and sort
+        params = {
+            "top_n": top_n,
+            "min_volume_usd": min_volume_usd,
+            "max_market_cap_rank": max_market_cap_rank,
+        }
+
+        cached = _cache_get(self.name, params)
+        if cached:
+            return cached
+
+        try:
+            # Fetch enough coins to cover the requested market-cap range.
+            per_page = min(max_market_cap_rank, 250)
+
+            data = _get_coingecko(
+                "/coins/markets",
+                {
+                    "vs_currency": "usd",
+                    "order": "market_cap_desc",
+                    "per_page": per_page,
+                    "page": 1,
+                    "price_change_percentage": "1h,24h,7d",
+                    "sparkline": "false",
+                },
+            )
+
+            stablecoins = {
+                "usdt",
+                "usdc",
+                "dai",
+                "busd",
+                "tusd",
+            }
+
+            wrapped_assets = {
+                "wbtc",
+                "weth",
+            }
+
             candidates = []
-            for coin in raw:
-                volume = coin.get("total_volume") or 0
-                rank = coin.get("market_cap_rank") or 9999
-                change_24h = coin.get("price_change_percentage_24h") or 0.0
-                if volume < min_volume_usd or rank > max_market_cap_rank:
+
+            for coin in data:
+                coin_id = (coin.get("id") or "").lower()
+                symbol = (coin.get("symbol") or "").lower()
+
+                market_cap_rank = coin.get("market_cap_rank")
+                volume = _safe_float(coin.get("total_volume"))
+
+                if symbol in stablecoins or symbol in wrapped_assets:
                     continue
-                candidates.append(
-                    {
-                        "coin_id": coin.get("id", ""),
-                        "symbol": (coin.get("symbol") or "").upper(),
-                        "name": coin.get("name", ""),
-                        "current_price_usd": coin.get("current_price"),
-                        "market_cap_rank": rank,
-                        "price_change_1h_pct": coin.get(
-                            "price_change_percentage_1h_in_currency"
-                        ),
-                        "price_change_24h_pct": change_24h,
-                        "price_change_7d_pct": coin.get(
-                            "price_change_percentage_7d_in_currency"
-                        ),
-                        "volume_24h_usd": volume,
-                        "market_cap_usd": coin.get("market_cap"),
-                    }
+
+                if market_cap_rank is None:
+                    continue
+
+                if market_cap_rank > max_market_cap_rank:
+                    continue
+
+                if volume < min_volume_usd:
+                    continue
+
+                candidates.append({
+                    "coin_id": coin_id,
+                    "symbol": symbol.upper(),
+                    "name": coin.get("name"),
+                    "current_price": _safe_float(
+                        coin.get("current_price")
+                    ),
+                    "market_cap_rank": market_cap_rank,
+                    "price_change_1h_pct": _safe_float(
+                        coin.get("price_change_percentage_1h_in_currency")
+                    ),
+                    "price_change_24h_pct": _safe_float(
+                        coin.get("price_change_percentage_24h_in_currency")
+                    ),
+                    "price_change_7d_pct": _safe_float(
+                        coin.get("price_change_percentage_7d_in_currency")
+                    ),
+                    "volume_24h_usd": volume,
+                    "market_cap_usd": _safe_float(
+                        coin.get("market_cap")
+                    ),
+                })
+
+            # Momentum score deliberately combines multiple timeframes.
+            # It is NOT simply sorted by 24h gain anymore.
+            def momentum_score(coin: dict) -> float:
+                one_h = coin["price_change_1h_pct"]
+                one_d = coin["price_change_24h_pct"]
+                seven_d = coin["price_change_7d_pct"]
+
+                return (
+                    abs(one_h) * 0.25
+                    + abs(one_d) * 0.50
+                    + abs(seven_d) * 0.25
                 )
 
-            # Sort by 24h gain descending, take top_n
             candidates.sort(
-                key=lambda c: c["price_change_24h_pct"] or 0.0, reverse=True
+                key=momentum_score,
+                reverse=True,
             )
-            top = candidates[:top_n]
 
-            result = json.dumps(
-                {
-                    "source": "coingecko_momentum_screener",
-                    "timestamp_utc": datetime.now(timezone.utc).isoformat(),
-                    "filters": {
-                        "min_volume_usd": min_volume_usd,
-                        "max_market_cap_rank": max_market_cap_rank,
-                    },
-                    "count": len(top),
-                    "coins": top,
-                }
-            )
-            _cache_put(self.name, args, result)
+            result = json.dumps({
+                "source": "coingecko_momentum_screener",
+                "criteria": {
+                    "min_volume_usd": min_volume_usd,
+                    "max_market_cap_rank": max_market_cap_rank,
+                },
+                "coins": candidates[:top_n],
+            })
+
+            _cache_put(self.name, params, result)
             return result
-        except requests.RequestException as exc:
-            return json.dumps({"error": f"API request failed: {exc}"})
+
         except Exception as exc:
-            return json.dumps({"error": str(exc)})
+            return _error(
+                f"momentum_screener failed: {type(exc).__name__}: {exc}"
+            )
 
 
 # ---------------------------------------------------------------------------
-# Upcoming Catalysts Tool  (CryptoPanic news scan)
+# Volatility Screener
+# ---------------------------------------------------------------------------
+
+class VolatilityScreenerInput(BaseModel):
+    top_n: int = Field(
+        default=20,
+        ge=1,
+        le=50,
+        description="Maximum number of volatility candidates.",
+    )
+
+    min_volume_usd: float = Field(
+        default=1_000_000,
+        ge=0,
+        description="Minimum 24h trading volume in USD.",
+    )
+
+    max_market_cap_rank: int = Field(
+        default=500,
+        ge=1,
+        le=1000,
+        description="Maximum CoinGecko market-cap rank.",
+    )
+
+
+class VolatilityScreenerTool(BaseTool):
+    name: str = "volatility_screener"
+    description: str = (
+        "Find liquid cryptocurrencies with high short-term tradable "
+        "volatility. Uses CoinGecko's 7-day hourly price series to calculate "
+        "realized volatility, maximum rolling 24h range, movement frequency, "
+        "and recent price movement. This is the primary volatility signal."
+    )
+    args_schema: Type[BaseModel] = VolatilityScreenerInput
+
+    def _run(
+        self,
+        top_n: int = 20,
+        min_volume_usd: float = 1_000_000,
+        max_market_cap_rank: int = 500,
+    ) -> str:
+
+        params = {
+            "top_n": top_n,
+            "min_volume_usd": min_volume_usd,
+            "max_market_cap_rank": max_market_cap_rank,
+        }
+
+        cached = _cache_get(self.name, params)
+        if cached:
+            return cached
+
+        try:
+            # Keep this bounded because sparkline data is substantially larger
+            # than ordinary /coins/markets responses.
+            per_page = min(max_market_cap_rank, 100)
+
+            data = _get_coingecko(
+                "/coins/markets",
+                {
+                    "vs_currency": "usd",
+                    "order": "market_cap_desc",
+                    "per_page": per_page,
+                    "page": 1,
+                    "price_change_percentage": "1h,24h,7d",
+                    "sparkline": "true",
+                },
+            )
+
+            stablecoins = {
+                "usdt",
+                "usdc",
+                "dai",
+                "busd",
+                "tusd",
+            }
+
+            wrapped_assets = {
+                "wbtc",
+                "weth",
+            }
+
+            candidates = []
+
+            for coin in data:
+                coin_id = (coin.get("id") or "").lower()
+                symbol = (coin.get("symbol") or "").lower()
+
+                if symbol in stablecoins or symbol in wrapped_assets:
+                    continue
+
+                market_cap_rank = coin.get("market_cap_rank")
+                volume = _safe_float(coin.get("total_volume"))
+
+                if market_cap_rank is None:
+                    continue
+
+                if market_cap_rank > max_market_cap_rank:
+                    continue
+
+                if volume < min_volume_usd:
+                    continue
+
+                prices = (
+                    coin.get("sparkline_in_7d", {})
+                    .get("price", [])
+                )
+
+                if len(prices) < 24:
+                    continue
+
+                prices = [
+                    _safe_float(price)
+                    for price in prices
+                    if _safe_float(price) > 0
+                ]
+
+                if len(prices) < 24:
+                    continue
+
+                # -------------------------------------------------------
+                # Hourly log returns
+                # -------------------------------------------------------
+
+                returns = []
+
+                for previous, current in zip(
+                    prices[:-1],
+                    prices[1:],
+                ):
+                    value = _log_return(previous, current)
+
+                    if value is not None and math.isfinite(value):
+                        returns.append(value)
+
+                if len(returns) < 12:
+                    continue
+
+                # Realized hourly volatility.
+                mean_return = sum(returns) / len(returns)
+
+                variance = sum(
+                    (r - mean_return) ** 2
+                    for r in returns
+                ) / len(returns)
+
+                hourly_volatility = math.sqrt(variance)
+
+                # Scale hourly volatility to a 24h horizon.
+                realized_volatility_24h_pct = (
+                    hourly_volatility
+                    * math.sqrt(24)
+                    * 100
+                )
+
+                # -------------------------------------------------------
+                # Rolling 24h price range
+                # -------------------------------------------------------
+
+                rolling_ranges = []
+
+                for i in range(23, len(prices)):
+                    window = prices[i - 23:i + 1]
+
+                    low = min(window)
+                    high = max(window)
+
+                    if low > 0:
+                        rolling_range = (
+                            (high - low) / low
+                        ) * 100
+
+                        rolling_ranges.append(rolling_range)
+
+                max_rolling_24h_range_pct = (
+                    max(rolling_ranges)
+                    if rolling_ranges
+                    else 0.0
+                )
+
+                # -------------------------------------------------------
+                # Movement frequency
+                # -------------------------------------------------------
+                #
+                # Count hourly moves >= 1%.
+                # This is intentionally separate from net 24h change.
+                # A coin that oscillates +4%, -3%, +5%, -4% can have
+                # enormous trading volatility despite finishing near 0%.
+                # -------------------------------------------------------
+
+                significant_move_count = sum(
+                    1
+                    for r in returns
+                    if abs(r) >= math.log(1.01)
+                )
+
+                movement_frequency_pct = (
+                    significant_move_count / len(returns)
+                ) * 100
+
+                # -------------------------------------------------------
+                # Recent 24h realized volatility
+                # -------------------------------------------------------
+
+                recent_returns = returns[-24:]
+
+                if len(recent_returns) >= 6:
+                    recent_mean = (
+                        sum(recent_returns)
+                        / len(recent_returns)
+                    )
+
+                    recent_variance = sum(
+                        (r - recent_mean) ** 2
+                        for r in recent_returns
+                    ) / len(recent_returns)
+
+                    recent_realized_volatility_24h_pct = (
+                        math.sqrt(recent_variance)
+                        * math.sqrt(24)
+                        * 100
+                    )
+                else:
+                    recent_realized_volatility_24h_pct = (
+                        realized_volatility_24h_pct
+                    )
+
+                current_price = _safe_float(
+                    coin.get("current_price")
+                )
+
+                price_change_24h = _safe_float(
+                    coin.get(
+                        "price_change_percentage_24h_in_currency"
+                    )
+                )
+
+                price_change_7d = _safe_float(
+                    coin.get(
+                        "price_change_percentage_7d_in_currency"
+                    )
+                )
+
+                candidates.append({
+                    "coin_id": coin_id,
+                    "symbol": symbol.upper(),
+                    "name": coin.get("name"),
+                    "current_price": current_price,
+                    "market_cap_rank": market_cap_rank,
+                    "volume_24h_usd": volume,
+                    "market_cap_usd": _safe_float(
+                        coin.get("market_cap")
+                    ),
+
+                    # Primary volatility signals
+                    "realized_volatility_7d_pct": round(
+                        realized_volatility_24h_pct,
+                        4,
+                    ),
+                    "recent_realized_volatility_24h_pct": round(
+                        recent_realized_volatility_24h_pct,
+                        4,
+                    ),
+                    "max_rolling_24h_range_pct": round(
+                        max_rolling_24h_range_pct,
+                        4,
+                    ),
+                    "movement_frequency_pct": round(
+                        movement_frequency_pct,
+                        2,
+                    ),
+
+                    # Context, NOT volatility itself
+                    "price_change_24h_pct": price_change_24h,
+                    "price_change_7d_pct": price_change_7d,
+                })
+
+            # -----------------------------------------------------------
+            # Volatility score
+            # -----------------------------------------------------------
+            #
+            # Normalize each metric relative to the candidates in this
+            # scan. This prevents raw values such as 0.04 vs 12.0 from
+            # being combined directly.
+            # -----------------------------------------------------------
+
+            def percentile_rank(values: list[float], value: float) -> float:
+                if not values:
+                    return 0.0
+
+                below_or_equal = sum(
+                    1 for item in values
+                    if item <= value
+                )
+
+                return below_or_equal / len(values)
+
+            volatility_values = [
+                c["recent_realized_volatility_24h_pct"]
+                for c in candidates
+            ]
+
+            range_values = [
+                c["max_rolling_24h_range_pct"]
+                for c in candidates
+            ]
+
+            movement_values = [
+                c["movement_frequency_pct"]
+                for c in candidates
+            ]
+
+            volume_values = [
+                math.log10(max(c["volume_24h_usd"], 1))
+                for c in candidates
+            ]
+
+            for coin in candidates:
+                volatility_rank = percentile_rank(
+                    volatility_values,
+                    coin["recent_realized_volatility_24h_pct"],
+                )
+
+                range_rank = percentile_rank(
+                    range_values,
+                    coin["max_rolling_24h_range_pct"],
+                )
+
+                movement_rank = percentile_rank(
+                    movement_values,
+                    coin["movement_frequency_pct"],
+                )
+
+                liquidity_rank = percentile_rank(
+                    volume_values,
+                    math.log10(
+                        max(coin["volume_24h_usd"], 1)
+                    ),
+                )
+
+                # Volatility is deliberately dominant.
+                coin["volatility_score"] = round(
+                    (
+                        volatility_rank * 0.40
+                        + range_rank * 0.30
+                        + movement_rank * 0.20
+                        + liquidity_rank * 0.10
+                    ) * 100,
+                    2,
+                )
+
+            candidates.sort(
+                key=lambda c: (
+                    c["volatility_score"],
+                    c["volume_24h_usd"],
+                ),
+                reverse=True,
+            )
+
+            result = json.dumps({
+                "source": "coingecko_volatility_screener",
+                "methodology": {
+                    "price_series": "7d hourly sparkline",
+                    "realized_volatility": (
+                        "hourly log-return standard deviation "
+                        "scaled to 24h"
+                    ),
+                    "range": "maximum rolling 24h high-low range",
+                    "movement_frequency": (
+                        "percentage of hourly moves >= 1%"
+                    ),
+                    "liquidity": "24h USD volume",
+                },
+                "criteria": {
+                    "min_volume_usd": min_volume_usd,
+                    "max_market_cap_rank": max_market_cap_rank,
+                },
+                "coins": candidates[:top_n],
+            })
+
+            _cache_put(self.name, params, result)
+            return result
+
+        except Exception as exc:
+            return _error(
+                f"volatility_screener failed: {type(exc).__name__}: {exc}"
+            )
+
+
+# ---------------------------------------------------------------------------
+# New Listings
+# ---------------------------------------------------------------------------
+
+class NewListingsInput(BaseModel):
+    top_n: int = Field(
+        default=20,
+        ge=1,
+        le=50,
+        description="Number of recently added market entries to inspect.",
+    )
+
+
+class NewListingsTool(BaseTool):
+    name: str = "new_listings"
+    description: str = (
+        "Identify newer CoinGecko market entries that may be undergoing "
+        "active price discovery. Treat these as potential volatility sources, "
+        "but verify volume and liquidity before selecting them."
+    )
+    args_schema: Type[BaseModel] = NewListingsInput
+
+    def _run(self, top_n: int = 20) -> str:
+        params = {"top_n": top_n}
+
+        cached = _cache_get(self.name, params)
+        if cached:
+            return cached
+
+        try:
+            data = _get_coingecko(
+                "/coins/markets",
+                {
+                    "vs_currency": "usd",
+                    "order": "id_desc",
+                    "per_page": top_n,
+                    "page": 1,
+                    "price_change_percentage": "24h",
+                    "sparkline": "false",
+                },
+            )
+
+            coins = []
+
+            for coin in data:
+                current_price = _safe_float(
+                    coin.get("current_price")
+                )
+
+                if current_price <= 0:
+                    continue
+
+                coins.append({
+                    "coin_id": coin.get("id"),
+                    "symbol": (
+                        coin.get("symbol") or ""
+                    ).upper(),
+                    "name": coin.get("name"),
+                    "current_price": current_price,
+                    "market_cap_usd": _safe_float(
+                        coin.get("market_cap")
+                    ),
+                    "market_cap_rank": coin.get(
+                        "market_cap_rank"
+                    ),
+                    "price_change_24h_pct": _safe_float(
+                        coin.get(
+                            "price_change_percentage_24h_in_currency"
+                        )
+                    ),
+                    "volume_24h_usd": _safe_float(
+                        coin.get("total_volume")
+                    ),
+                })
+
+            result = json.dumps({
+                "source": "coingecko_new_listing_candidates",
+                "note": (
+                    "CoinGecko's id_desc ordering is used as a candidate "
+                    "source; it should not be interpreted as an exact "
+                    "listing-date ranking."
+                ),
+                "coins": coins,
+            })
+
+            _cache_put(self.name, params, result)
+            return result
+
+        except Exception as exc:
+            return _error(
+                f"new_listings failed: {type(exc).__name__}: {exc}"
+            )
+
+
+# ---------------------------------------------------------------------------
+# Upcoming Catalysts
 # ---------------------------------------------------------------------------
 
 class UpcomingCatalystsInput(BaseModel):
     limit: int = Field(
         default=20,
-        ge=5,
+        ge=1,
         le=50,
-        description="Number of news items to scan for catalyst signals.",
+        description="Maximum number of catalyst entries.",
     )
 
 
 class UpcomingCatalystsTool(BaseTool):
     name: str = "upcoming_catalysts"
     description: str = (
-        "Scans CryptoPanic's 'important' and 'rising' news feeds to surface coins "
-        "with significant upcoming or recent catalysts: ETF filings, exchange listings, "
-        "protocol upgrades, token unlocks, regulatory news, and major partnerships. "
-        "Returns the coin tickers mentioned, headline snippets, and vote counts. "
-        "Use this to identify narrative-driven opportunities that precede price moves."
+        "Scan NewsData.io cryptocurrency news for recent or imminent "
+        "events that may cause short-term price movement. Positive and "
+        "negative catalysts are reported as signals. Negative news is "
+        "not automatically an exclusion unless it indicates the asset "
+        "is unsafe or effectively untradeable."
     )
     args_schema: Type[BaseModel] = UpcomingCatalystsInput
 
-    # Keywords that indicate a meaningful catalyst
-    _BULLISH_KEYWORDS = [
-        "etf", "listing", "upgrade", "partnership", "integration", "launch",
-        "mainnet", "approval", "institutional", "adoption", "grant", "audit passed",
-        "staking", "airdrop", "burn", "buyback",
-    ]
-    _BEARISH_KEYWORDS = [
-        "hack", "exploit", "breach", "sec", "lawsuit", "ban", "regulation",
-        "delist", "rug", "exit scam", "fraud", "penalty", "unlock", "dump",
-        "vulnerability", "attack",
-    ]
+    _BULLISH_KEYWORDS = {
+        "etf",
+        "listing",
+        "upgrade",
+        "partnership",
+        "integration",
+        "launch",
+        "mainnet",
+        "approval",
+        "institutional",
+        "adoption",
+        "grant",
+        "audit passed",
+        "staking",
+        "airdrop",
+        "burn",
+        "buyback",
+    }
+
+    _BEARISH_KEYWORDS = {
+        "hack",
+        "exploit",
+        "breach",
+        "sec",
+        "lawsuit",
+        "ban",
+        "regulation",
+        "delist",
+        "rug",
+        "exit scam",
+        "fraud",
+        "penalty",
+        "unlock",
+        "dump",
+        "vulnerability",
+        "attack",
+    }
 
     def _run(self, limit: int = 20) -> str:
-        args = {"limit": limit}
-        cached = _cache_get(self.name, args)
-        if cached is not None:
+        params = {"limit": limit}
+
+        cached = _cache_get(self.name, params)
+        if cached:
             return cached
 
-        # Outer try/except: any failure returns a valid empty result so the
-        # agent can continue with the other three tools.
-        try:
-            # Endpoint accepts only the apikey (embedded in URL), no query params.
-            resp = requests.get(_CRYPTOPANIC_URL, timeout=_DEFAULT_TIMEOUT)
-            resp.raise_for_status()
-            items: list[dict] = resp.json().get("results", [])
-        except Exception:
-            # API down, timeout, bad JSON, rate limit — return empty valid shape
-            # so the scout task does not crash.
-            return json.dumps(
-                {
-                    "source": "cryptopanic_catalyst_scan",
-                    "timestamp_utc": datetime.now(timezone.utc).isoformat(),
-                    "articles_scanned": 0,
-                    "catalyst_articles_found": 0,
-                    "coins_with_catalysts": [],
-                }
+        if not _NEWSDATA_API_KEY:
+            return _error(
+                "upcoming_catalysts failed: NEWSDATA_API_KEY "
+                "environment variable is not set"
             )
 
         try:
-            # Deduplicate by URL
-            seen: set[str] = set()
-            unique: list[dict] = []
-            for item in items:
-                url = item.get("url", "")
-                if url not in seen:
-                    seen.add(url)
-                    unique.append(item)
+            response = requests.get(
+                _NEWSDATA_URL,
+                params={
+                    "apikey": _NEWSDATA_API_KEY,
+                    "q": "crypto OR cryptocurrency OR bitcoin OR ethereum",
+                    "language": "en",
+                },
+                timeout=_DEFAULT_TIMEOUT,
+                headers={
+                    "accept": "application/json",
+                    "user-agent": "market-scout/1.0",
+                },
+            )
 
-            results = []
-            for item in unique[:limit]:
-                title = item.get("title", "").lower()
-                votes = item.get("votes", {}) or {}
-                bull = votes.get("positive", 0) or 0
-                bear = votes.get("negative", 0) or 0
+            response.raise_for_status()
+            data = response.json()
 
-                # Detect catalyst type from title text
-                bullish_flags = [kw for kw in self._BULLISH_KEYWORDS if kw in title]
-                bearish_flags = [kw for kw in self._BEARISH_KEYWORDS if kw in title]
+            articles = data.get("results", [])
 
-                if not bullish_flags and not bearish_flags:
-                    continue  # Skip generic news
+            catalyst_articles = []
 
-                # Extract mentioned currencies from the API metadata
-                currencies = [
-                    c.get("code", "").upper()
-                    for c in (item.get("currencies") or [])
-                    if c.get("code")
+            for article in articles:
+                title = (
+                    article.get("title")
+                    or ""
+                ).strip()
+
+                description = (
+                    article.get("description")
+                    or ""
+                ).strip()
+
+                text_blob = (
+                    f"{title} {description}"
+                ).lower()
+
+                bullish_matches = [
+                    keyword
+                    for keyword in self._BULLISH_KEYWORDS
+                    if keyword in text_blob
                 ]
 
-                results.append(
-                    {
-                        "title": item.get("title", ""),
-                        "published_at": item.get("published_at", ""),
-                        "currencies": currencies,
-                        "bullish_flags": bullish_flags,
-                        "bearish_flags": bearish_flags,
-                        "catalyst_direction": (
-                            "bearish"
-                            if bearish_flags and not bullish_flags
-                            else "bullish"
-                            if bullish_flags and not bearish_flags
-                            else "mixed"
-                        ),
-                        "bullish_votes": bull,
-                        "bearish_votes": bear,
-                        "url": item.get("url", ""),
-                    }
-                )
+                bearish_matches = [
+                    keyword
+                    for keyword in self._BEARISH_KEYWORDS
+                    if keyword in text_blob
+                ]
 
-            # Group catalysts by coin
-            coin_catalysts: dict[str, list] = {}
-            for r in results:
-                for symbol in r["currencies"]:
-                    coin_catalysts.setdefault(symbol, []).append(
-                        {
-                            "title": r["title"],
-                            "direction": r["catalyst_direction"],
-                            "flags": r["bullish_flags"] + r["bearish_flags"],
-                            "votes": r["bullish_votes"] - r["bearish_votes"],
-                        }
-                    )
+                if not bullish_matches and not bearish_matches:
+                    continue
 
-            # Sort coins by net vote score
-            coin_summary = [
-                {
-                    "symbol": sym,
-                    "catalyst_count": len(cats),
-                    "net_vote_score": sum(c["votes"] for c in cats),
-                    "direction": (
-                        "bullish"
-                        if sum(1 for c in cats if c["direction"] == "bullish")
-                        > sum(1 for c in cats if c["direction"] == "bearish")
-                        else "bearish"
-                    ),
-                    "catalysts": cats[:3],  # top 3 per coin
-                }
-                for sym, cats in coin_catalysts.items()
-            ]
-            coin_summary.sort(key=lambda x: x["net_vote_score"], reverse=True)
+                # NewsData uses different fields depending on the feed.
+                # Keep extraction defensive.
+                symbols = []
 
-            result = json.dumps(
-                {
-                    "source": "cryptopanic_catalyst_scan",
-                    "timestamp_utc": datetime.now(timezone.utc).isoformat(),
-                    "articles_scanned": len(unique),
-                    "catalyst_articles_found": len(results),
-                    "coins_with_catalysts": coin_summary[:15],
-                }
-            )
-            _cache_put(self.name, args, result)
+                for symbol in (
+                    article.get("symbols")
+                    or article.get("crypto")
+                    or []
+                ):
+                    if isinstance(symbol, str):
+                        symbols.append(symbol.upper())
+
+                catalyst_articles.append({
+                    "title": title,
+                    "url": article.get("link"),
+                    "published_at": article.get("pubDate"),
+                    "source": article.get("source_name"),
+                    "bullish_keywords": bullish_matches,
+                    "bearish_keywords": bearish_matches,
+                    "symbols": symbols,
+                })
+
+            # Deduplicate URLs.
+            unique_articles = []
+            seen_urls = set()
+
+            for article in catalyst_articles:
+                url = article.get("url")
+
+                if url and url in seen_urls:
+                    continue
+
+                if url:
+                    seen_urls.add(url)
+
+                unique_articles.append(article)
+
+            result = json.dumps({
+                "source": "newsdata_catalyst_scan",
+                "articles_scanned": len(articles),
+                "catalyst_articles_found": len(unique_articles),
+                "articles": unique_articles[:limit],
+            })
+
+            _cache_put(self.name, params, result)
             return result
-        except Exception:
-            # Processing error after successful fetch — return empty valid shape
-            return json.dumps(
-                {
-                    "source": "cryptopanic_catalyst_scan",
-                    "timestamp_utc": datetime.now(timezone.utc).isoformat(),
-                    "articles_scanned": 0,
-                    "catalyst_articles_found": 0,
-                    "coins_with_catalysts": [],
-                }
+
+        except Exception as exc:
+            # IMPORTANT:
+            # Do not silently turn an API failure into "no catalysts".
+            return _error(
+                f"upcoming_catalysts failed: {type(exc).__name__}: {exc}"
             )
+
+
+# ---------------------------------------------------------------------------
+# Tool exports
+# ---------------------------------------------------------------------------
+
+trending_coins = TrendingCoinsTool()
+momentum_screener = MomentumScreenerTool()
+volatility_screener = VolatilityScreenerTool()
+new_listings = NewListingsTool()
+upcoming_catalysts = UpcomingCatalystsTool()

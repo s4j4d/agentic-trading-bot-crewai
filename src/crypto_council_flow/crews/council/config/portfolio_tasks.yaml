@@ -1,0 +1,69 @@
+portfolio_management_task:
+  description: >
+    Build a cap-aware paper rebalance plan from the current book and fresh signals.
+
+    Account size: {account_size} {base_currency} | Max total exposure:
+    {max_total_exposure_pct}% | Max single position: {max_single_position_pct}%.
+
+    Current open paper positions (JSON array of {"coin_id", "position"}):
+    {open_positions_json}
+
+    Merged opportunities (JSON array of {"coin_id",
+    "symbol", "score", "risk_tier", "reason"}):
+    {opportunities_json}
+
+    This list is the scout's fresh ranked shortlist PLUS any current book
+    holdings the scout dropped, carried with a neutral score of 50 and a
+    reason mentioning "carried with neutral score". Treat the merged list
+    as the full eligible universe — do not treat carried holdings as
+    ineligible for missing the scout shortlist.
+
+    Coins with a successfully completed analysis this cycle (JSON string array
+    of CoinGecko slugs):
+    {analysed_coins_json}
+
+    Only coins in the opportunities list are eligible for new or increased
+    exposure. Entries whose reason mentions "carried with neutral score"
+    are current book holdings the scout dropped this cycle — judge them on
+    their fresh analysis (they are in the analysed list because the flow
+    always analyses open positions): keep or trim on weak analysis, do not
+    auto-exit them for missing the scout list. A high-scored opportunity
+    with no completed analysis is not yet vetted — give it at most half
+    the single-coin maximum, unless the analysed
+    list is empty (analysis unavailable), in which case fall back to scout
+    scores alone.
+
+    Execute the following in order:
+    1. Portfolio Exposure — pass the open positions, account size, base currency,
+       and both caps to measure current total exposure and flag any cap breaches.
+    2. Rebalance Allocator — pass the opportunities (coin_id + score), the open
+       positions, the account size, base currency, both caps, and min_trade of
+       10.0 to get score-weighted, cap-aware targets.
+
+    Adopt the allocator targets as the plan unless a vetting rule above forces
+    a reduction — if you deviate, state exactly why in that action's reason.
+    Deltas under min_trade must be "hold" (keep the current size, never churn dust).
+
+  expected_output: >
+    A JSON object and nothing else, with keys "actions", "total_target",
+    "total_exposure_pct", "cash_remaining", and "rationale".
+
+    Each object in "actions" must have exactly:
+    {
+      "coin_id": "<coingecko_slug>",
+      "symbol": "<UPPERCASE_TICKER>",
+      "action": "<open|increase|decrease|close|hold>",
+      "current": <number>,
+      "target": <number>,
+      "reason": "<one sentence>"
+    }
+
+    Rules: total_target must not exceed account_size *
+    max_total_exposure_pct / 100. No single target may exceed
+    account_size * max_single_position_pct / 100. "close" implies
+    target 0. Sort actions by target descending.
+
+    Do not call file-writing tools.
+    Return JSON only.
+
+  agent: portfolio_manager

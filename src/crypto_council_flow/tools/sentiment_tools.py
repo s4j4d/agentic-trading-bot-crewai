@@ -17,10 +17,69 @@ from crewai.tools import BaseTool
 from pydantic import BaseModel, Field
 
 
-_DEFAULT_TIMEOUT = 20  # seconds
+_DEFAULT_TIMEOUT = 10  # seconds
 _COINGECKO_BASE = "https://api.coingecko.com/api/v3"
 _FEAR_GREED_URL = "https://api.alternative.me/fng/"
 _CRYPTOPANIC_URL = "https://newsdata.io/api/1/latest?apikey=pub_c111157bd75c4a9394c43bf276c0362a"
+
+
+# ---------------------------------------------------------------------------
+# Coin ID resolution — the agent often passes a symbol or short name that
+# doesn't match CoinGecko's slug.  This helper resolves it.
+# ---------------------------------------------------------------------------
+_COIN_LIST_CACHE: list[dict] | None = None
+
+
+def _resolve_coin_id(raw_id: str) -> str:
+    """Try ``raw_id`` as a CoinGecko slug first; if 404, resolve via /coins/list.
+
+    Returns the best-matching CoinGecko ``id`` slug, or the original ``raw_id``
+    if resolution fails (so the caller still gets a meaningful error).
+    """
+    global _COIN_LIST_CACHE
+
+    # 1. Quick check — if the raw_id already works, just return it.
+    try:
+        resp = requests.get(
+            f"{_COINGECKO_BASE}/coins/{raw_id}",
+            params={"localization": "false", "tickers": "false",
+                    "market_data": "false", "community_data": "false",
+                    "developer_data": "false", "sparkline": "false"},
+            timeout=_DEFAULT_TIMEOUT,
+        )
+        if resp.status_code == 200:
+            return raw_id
+    except requests.RequestException:
+        pass
+
+    # 2. Fetch the full coin list (cached in module global).
+    if _COIN_LIST_CACHE is None:
+        try:
+            resp = requests.get(f"{_COINGECKO_BASE}/coins/list", timeout=_DEFAULT_TIMEOUT)
+            resp.raise_for_status()
+            _COIN_LIST_CACHE = resp.json()
+        except Exception:
+            return raw_id  # give up — let caller handle the error
+
+    lower = raw_id.lower()
+
+    # 3. Exact id match (case-insensitive).
+    for coin in _COIN_LIST_CACHE:
+        if coin.get("id", "").lower() == lower:
+            return coin["id"]
+
+    # 4. Exact symbol match — take the one with the shortest id (usually canonical).
+    symbol_matches = [c for c in _COIN_LIST_CACHE if c.get("symbol", "").lower() == lower]
+    if symbol_matches:
+        symbol_matches.sort(key=lambda c: len(c.get("id", "")))
+        return symbol_matches[0]["id"]
+
+    # 5. Name contains the query.
+    for coin in _COIN_LIST_CACHE:
+        if lower in (coin.get("name", "").lower()):
+            return coin["id"]
+
+    return raw_id  # fallback
 
 
 # ---------------------------------------------------------------------------
@@ -232,6 +291,7 @@ class CommunitySentimentTool(BaseTool):
 
     def _run(self, coin_id: str) -> str:
         try:
+            coin_id = _resolve_coin_id(coin_id)
             url = f"{_COINGECKO_BASE}/coins/{coin_id}"
             params = {
                 "localization": "false",

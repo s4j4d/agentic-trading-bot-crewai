@@ -18,10 +18,10 @@ from typing import Type
 import numpy as np
 import requests
 from crewai.tools import BaseTool
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
-_DEFAULT_TIMEOUT = 15
+_DEFAULT_TIMEOUT = 10
 _COINGECKO_BASE = "https://api.coingecko.com/api/v3"
 
 
@@ -43,7 +43,7 @@ def _fetch_daily_closes(coin_id: str, vs_currency: str, days: int) -> np.ndarray
 # ---------------------------------------------------------------------------
 
 class PositionSizingInput(BaseModel):
-    account_size_usd: float = Field(..., gt=0, description="Total trading account size in USD.")
+    account_size: float = Field(..., gt=0, description="Total trading account size.")
     entry_price: float = Field(..., gt=0, description="Planned entry price for the asset.")
     stop_loss_price: float = Field(..., gt=0, description="Stop-loss price level.")
     win_rate: float = Field(
@@ -70,15 +70,15 @@ class PositionSizingTool(BaseTool):
     name: str = "position_sizing"
     description: str = (
         "Calculates optimal position size using both the Kelly Criterion and a "
-        "fixed-risk model. Returns the number of units to buy, dollar value of the "
-        "position, risk in USD, and Kelly fraction. Helps prevent over-sizing that "
+        "fixed-risk model. Returns the number of units to buy, value of the "
+        "position, risk amount, and Kelly fraction. Helps prevent over-sizing that "
         "leads to account blow-up."
     )
     args_schema: Type[BaseModel] = PositionSizingInput
 
     def _run(
         self,
-        account_size_usd: float,
+        account_size: float,
         entry_price: float,
         stop_loss_price: float,
         win_rate: float = 0.55,
@@ -94,24 +94,24 @@ class PositionSizingTool(BaseTool):
                 return json.dumps({"error": "Entry price and stop-loss price cannot be equal."})
 
             # Fixed-risk model
-            max_risk_usd = account_size_usd * (max_risk_pct / 100)
-            fixed_units = max_risk_usd / risk_per_unit
-            fixed_position_usd = fixed_units * entry_price
+            max_risk = account_size * (max_risk_pct / 100)
+            fixed_units = max_risk / risk_per_unit
+            fixed_position = fixed_units * entry_price
 
             # Kelly Criterion: f* = W - (1-W)/R where R = reward/risk ratio
             kelly_fraction = win_rate - (1 - win_rate) / reward_risk_ratio
             half_kelly = kelly_fraction / 2  # half-Kelly for safety
-            kelly_position_usd = max(0.0, account_size_usd * half_kelly)
-            kelly_units = kelly_position_usd / entry_price
+            kelly_position = max(0.0, account_size * half_kelly)
+            kelly_units = kelly_position / entry_price
 
             # Use the more conservative of the two
             recommended_units = min(fixed_units, kelly_units)
-            recommended_position_usd = recommended_units * entry_price
-            actual_risk_usd = recommended_units * risk_per_unit
-            actual_risk_pct = actual_risk_usd / account_size_usd * 100
+            recommended_position = recommended_units * entry_price
+            actual_risk = recommended_units * risk_per_unit
+            actual_risk_pct = actual_risk / account_size * 100
 
             return json.dumps({
-                "account_size_usd": account_size_usd,
+                "account_size": account_size,
                 "entry_price": entry_price,
                 "stop_loss_price": stop_loss_price,
                 "risk_per_unit": round(risk_per_unit, 6),
@@ -119,19 +119,19 @@ class PositionSizingTool(BaseTool):
                 "reward_risk_ratio": reward_risk_ratio,
                 "fixed_risk_model": {
                     "units": round(fixed_units, 6),
-                    "position_usd": round(fixed_position_usd, 2),
-                    "risk_usd": round(max_risk_usd, 2),
+                    "position": round(fixed_position, 2),
+                    "risk": round(max_risk, 2),
                 },
                 "kelly_criterion": {
                     "full_kelly_fraction": round(kelly_fraction, 4),
                     "half_kelly_fraction": round(half_kelly, 4),
                     "units": round(kelly_units, 6),
-                    "position_usd": round(kelly_position_usd, 2),
+                    "position": round(kelly_position, 2),
                 },
                 "recommended": {
                     "units": round(recommended_units, 6),
-                    "position_usd": round(recommended_position_usd, 2),
-                    "risk_usd": round(actual_risk_usd, 2),
+                    "position": round(recommended_position, 2),
+                    "risk": round(actual_risk, 2),
                     "risk_pct_of_account": round(actual_risk_pct, 2),
                     "basis": "more_conservative_of_fixed_risk_and_half_kelly",
                 },
@@ -146,7 +146,10 @@ class PositionSizingTool(BaseTool):
 
 class LiquidationPriceInput(BaseModel):
     entry_price: float = Field(..., gt=0, description="Entry price of the leveraged position.")
-    leverage: float = Field(..., ge=1.0, le=200.0, description="Leverage multiplier (e.g. 10 for 10x).")
+    leverage_levels: list[float] = Field(
+        default=[2.0, 5.0],
+        description="Leverage levels to evaluate, e.g. [2, 5] for 2x and 5x scenarios.",
+    )
     position_side: str = Field(
         default="long",
         description="Position side: 'long' or 'short'.",
@@ -161,73 +164,109 @@ class LiquidationPriceInput(BaseModel):
         ),
     )
 
+    model_config = {"extra": "ignore"}
+
+    @model_validator(mode="before")
+    @classmethod
+    def _normalise_singular_leverage(cls, data: object) -> object:
+        # Single canonical DTO: always end up with leverage_levels.
+        # If the LLM passes the old singular `leverage`, fold it in.
+        if not isinstance(data, dict):
+            return data
+        d = dict(data)
+        if d.get("leverage_levels") is None and d.get("leverage") is not None:
+            raw = d.pop("leverage")
+            d["leverage_levels"] = [raw] if not isinstance(raw, list) else raw
+        return d
+
+    @field_validator("leverage_levels")
+    @classmethod
+    def _check_levels(cls, v: list[float]) -> list[float]:
+        if not v:
+            raise ValueError("leverage_levels must contain at least one level")
+        for level in v:
+            if not 1.0 <= float(level) <= 200.0:
+                raise ValueError(f"leverage level {level} out of range [1, 200]")
+        return [float(x) for x in v]
+
 
 class LiquidationPriceTool(BaseTool):
     name: str = "liquidation_price"
     description: str = (
         "Calculates the liquidation price for a leveraged crypto futures or margin position. "
-        "Returns the liquidation price, the percentage drop/rise from entry to liquidation, "
-        "and a safety buffer recommendation. Essential for managing leveraged trade risk."
+        "Pass leverage_levels as a list (e.g. [2, 5]) to evaluate multiple leverage scenarios "
+        "in a single call. Returns the liquidation price, the percentage drop/rise from entry "
+        "to liquidation, and a safety buffer recommendation per level. "
+        "Essential for managing leveraged trade risk."
     )
     args_schema: Type[BaseModel] = LiquidationPriceInput
 
     def _run(
         self,
         entry_price: float,
-        leverage: float,
+        leverage_levels: list[float] | None = None,
         position_side: str = "long",
         maintenance_margin_rate: float = 0.005,
     ) -> str:
         try:
+            levels = leverage_levels or [2.0, 5.0]
             side = position_side.lower().strip()
             if side not in ("long", "short"):
                 return json.dumps({"error": "position_side must be 'long' or 'short'."})
 
-            initial_margin_rate = 1.0 / leverage
+            scenarios = []
+            for leverage in levels:
+                initial_margin_rate = 1.0 / leverage
 
-            # Standard formula: liq_price = entry * (1 ± (initial_margin - maintenance_margin))
-            # Long: liq = entry * (1 - (1/leverage - maintenance_margin_rate))
-            # Short: liq = entry * (1 + (1/leverage - maintenance_margin_rate))
-            margin_diff = initial_margin_rate - maintenance_margin_rate
+                # Standard formula: liq_price = entry * (1 ± (initial_margin - maintenance_margin))
+                # Long: liq = entry * (1 - (1/leverage - maintenance_margin_rate))
+                # Short: liq = entry * (1 + (1/leverage - maintenance_margin_rate))
+                margin_diff = initial_margin_rate - maintenance_margin_rate
 
-            if side == "long":
-                liquidation_price = entry_price * (1 - margin_diff)
-                distance_pct = round((entry_price - liquidation_price) / entry_price * 100, 3)
-                direction = "price_drops_by"
-            else:
-                liquidation_price = entry_price * (1 + margin_diff)
-                distance_pct = round((liquidation_price - entry_price) / entry_price * 100, 3)
-                direction = "price_rises_by"
+                if side == "long":
+                    liquidation_price = entry_price * (1 - margin_diff)
+                    distance_pct = round((entry_price - liquidation_price) / entry_price * 100, 3)
+                    direction = "price_drops_by"
+                else:
+                    liquidation_price = entry_price * (1 + margin_diff)
+                    distance_pct = round((liquidation_price - entry_price) / entry_price * 100, 3)
+                    direction = "price_rises_by"
 
-            liquidation_price = round(liquidation_price, 6)
+                liquidation_price = round(liquidation_price, 6)
 
-            # Safety buffer: suggest stop-loss at 50% of distance to liq
-            safe_stop_pct = distance_pct * 0.5
-            if side == "long":
-                suggested_stop = round(entry_price * (1 - safe_stop_pct / 100), 6)
-            else:
-                suggested_stop = round(entry_price * (1 + safe_stop_pct / 100), 6)
+                # Safety buffer: suggest stop-loss at 50% of distance to liq
+                safe_stop_pct = distance_pct * 0.5
+                if side == "long":
+                    suggested_stop = round(entry_price * (1 - safe_stop_pct / 100), 6)
+                else:
+                    suggested_stop = round(entry_price * (1 + safe_stop_pct / 100), 6)
 
-            risk_level = (
-                "extreme" if distance_pct < 5
-                else "high" if distance_pct < 15
-                else "moderate" if distance_pct < 30
-                else "low"
-            )
+                risk_level = (
+                    "extreme" if distance_pct < 5
+                    else "high" if distance_pct < 15
+                    else "moderate" if distance_pct < 30
+                    else "low"
+                )
 
+                scenarios.append({
+                    "leverage": leverage,
+                    "liquidation_price": liquidation_price,
+                    "distance_to_liquidation_pct": distance_pct,
+                    "distance_direction": direction,
+                    "risk_level": risk_level,
+                    "suggested_stop_loss": suggested_stop,
+                })
+
+            max_liq = max(scenarios, key=lambda s: s["distance_to_liquidation_pct"])
             return json.dumps({
                 "entry_price": entry_price,
-                "leverage": leverage,
                 "position_side": side,
                 "maintenance_margin_rate": maintenance_margin_rate,
-                "liquidation_price": liquidation_price,
-                "distance_to_liquidation_pct": distance_pct,
-                "distance_direction": direction,
-                "risk_level": risk_level,
-                "suggested_stop_loss": suggested_stop,
+                "scenarios": scenarios,
                 "warning": (
-                    f"At {leverage}x leverage, a {distance_pct:.1f}% adverse move triggers liquidation. "
-                    f"Stop-loss at {suggested_stop} ({safe_stop_pct:.1f}% from entry) is recommended."
+                    f"Highest leverage evaluated ({max_liq['leverage']}x): a "
+                    f"{max_liq['distance_to_liquidation_pct']:.1f}% adverse move triggers "
+                    f"liquidation. Stop-loss at {max_liq['suggested_stop_loss']} is recommended."
                 ),
             })
         except Exception as exc:
@@ -248,10 +287,10 @@ class VaRInput(BaseModel):
         le=0.99,
         description="Confidence level for VaR (e.g. 0.95 = 95%).",
     )
-    position_size_usd: float = Field(
+    position_size: float = Field(
         default=10000.0,
         gt=0,
-        description="Hypothetical position size in USD for dollar-denominated risk figures.",
+        description="Hypothetical position size for risk figures in the base currency.",
     )
 
 
@@ -271,7 +310,7 @@ class PortfolioVaRTool(BaseTool):
         vs_currency: str = "usd",
         days: int = 90,
         confidence_level: float = 0.95,
-        position_size_usd: float = 10000.0,
+        position_size: float = 10000.0,
     ) -> str:
         try:
             closes = _fetch_daily_closes(coin_id, vs_currency, days)
@@ -291,8 +330,8 @@ class PortfolioVaRTool(BaseTool):
 
             var_pct = round(abs(var_return) * 100, 3)
             cvar_pct = round(abs(cvar_return) * 100, 3)
-            var_usd = round(position_size_usd * abs(var_return), 2)
-            cvar_usd = round(position_size_usd * abs(cvar_return), 2)
+            var_amount = round(position_size * abs(var_return), 2)
+            cvar_amount = round(position_size * abs(cvar_return), 2)
 
             # Annualised volatility
             ann_vol = round(float(np.std(log_returns, ddof=1)) * math.sqrt(365) * 100, 2)
@@ -308,16 +347,16 @@ class PortfolioVaRTool(BaseTool):
                 "vs_currency": vs_currency,
                 "days_analysed": n,
                 "confidence_level": confidence_level,
-                "position_size_usd": position_size_usd,
+                "position_size": position_size,
                 "historical_var": {
                     "daily_loss_pct": var_pct,
-                    "daily_loss_usd": var_usd,
-                    "interpretation": f"With {confidence_level*100:.0f}% confidence, max 1-day loss ≤ {var_pct}% (${var_usd:,.2f})",
+                    "daily_loss": var_amount,
+                    "interpretation": f"With {confidence_level*100:.0f}% confidence, max 1-day loss ≤ {var_pct}% ({var_amount:,.2f})",
                 },
                 "cvar_expected_shortfall": {
                     "daily_loss_pct": cvar_pct,
-                    "daily_loss_usd": cvar_usd,
-                    "interpretation": f"In the worst {(1-confidence_level)*100:.0f}% of days, average loss is {cvar_pct}% (${cvar_usd:,.2f})",
+                    "daily_loss": cvar_amount,
+                    "interpretation": f"In the worst {(1-confidence_level)*100:.0f}% of days, average loss is {cvar_pct}% ({cvar_amount:,.2f})",
                 },
                 "annualised_volatility_pct": ann_vol,
                 "max_drawdown_pct": max_drawdown_pct,

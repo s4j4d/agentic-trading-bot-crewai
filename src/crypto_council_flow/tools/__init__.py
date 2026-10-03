@@ -28,6 +28,16 @@ from crypto_council_flow.tools.scout_tools import (
     NewListingsTool,
     TrendingCoinsTool,
     UpcomingCatalystsTool,
+    VolatilityScreenerTool,
+)
+from crypto_council_flow.tools.exchange_base import (
+    ExchangeMarketsTool,
+    ExchangeTickerTool,
+    ExchangeOHLCTool,
+)
+from crypto_council_flow.tools.portfolio_tools import (
+    PortfolioExposureTool,
+    RebalanceAllocatorTool,
 )
 
 __all__ = [
@@ -52,4 +62,12 @@ __all__ = [
     "MomentumScreenerTool",
     "NewListingsTool",
     "UpcomingCatalystsTool",
+    "VolatilityScreenerTool",
+    # Exchange market data (abstract, exchange-agnostic)
+    "ExchangeMarketsTool",
+    "ExchangeTickerTool",
+    "ExchangeOHLCTool",
+    # Portfolio management (paper)
+    "PortfolioExposureTool",
+    "RebalanceAllocatorTool",
 ]

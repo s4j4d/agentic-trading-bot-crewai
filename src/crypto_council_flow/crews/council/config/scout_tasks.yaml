@@ -1,41 +1,148 @@
 market_scout_task:
   description: >
     Scan the cryptocurrency market and produce a ranked shortlist of 3-7 coins
-    that represent the strongest short-term trading opportunities right now.
+    that represent strong short-term trading opportunities right now.
 
-    Run all four scouting tools in this order:
-    1. trending_coins (top_n=10) — identify coins with surging search interest.
-    2. momentum_screener (top_n=20, min_volume_usd=5000000, max_market_cap_rank=500)
-       — identify coins showing the strongest 24-hour price gains with real volume.
-    3. new_listings (top_n=20) — check for recently listed coins with early momentum.
-    4. upcoming_catalysts (limit=20) — find coins with imminent or recent bullish
-       catalysts (ETF filings, exchange listings, protocol upgrades, partnerships).
+    The primary objective is HIGH, TRADABLE SHORT-TERM VOLATILITY combined
+    with sufficient liquidity. Do not treat a large 24-hour percentage gain
+    as equivalent to volatility.
 
-    Apply the composite opportunity scoring model from your skill:
-    - Momentum: 40% weight (24h gain mapped 0–100)
-    - Trending rank: 30% weight (rank 1=100, rank 10=10)
-    - Catalyst net votes: 15% weight (capped at 100)
-    - New listing bonus: 15% weight
+    Call each required tool at most once unless a call fails.
+    Call tools ONE AT A TIME and wait for each result before the next call.
+    If a tool call errors or returns nothing usable, retry it once with
+    default arguments before moving on.
+    After collecting the results, analyze the existing observations.
+    Do not repeat successful tool calls.
 
-    Exclude coins that match any of these conditions:
-    - Volume < $1M in 24h
-    - No live price data
-    - Any bearish catalyst flag (hack, exploit, lawsuit, ban, rug, delist)
-    - 24h gain > 30% with no identifiable catalyst
-    - Is a stablecoin (USDT, USDC, DAI, BUSD, TUSD) or wrapped asset (WBTC, WETH)
+    A tool call is never a valid final answer. After the tool results are
+    in, you MUST write out the final JSON object described below as plain
+    text — do not finish with a function/tool call. If you are running out
+    of steps, skip remaining tool calls and write the JSON from whatever
+    data you already have.
 
-    Return between 3 and 7 coins, ranked by opportunity score.
+    Run all seven scouting tools — the four CoinGecko screeners plus the
+    three exchange tools:
+
+    0. exchange_markets (quote_currency="usdt", only_active=true, max_results=50)
+       Returns only a total_count plus a small sample — use it SOLELY to check
+       whether a candidate is tradeable. Do NOT analyse the sample list.
+       Confirm each finalist with exchange_ticker.
+
+    1. trending_coins (top_n=10)
+       Identify coins receiving unusually high market attention.
+       Use this as an attention signal, not as a volatility measurement.
+
+    2. momentum_screener
+       (top_n=20, min_volume_usd=5000000, max_market_cap_rank=500)
+       Identify liquid coins with strong recent momentum across multiple
+       timeframes. Use this for momentum and volume, not as the primary
+       volatility measurement.
+
+    3. volatility_screener
+       (top_n=20, min_volume_usd=1000000, max_market_cap_rank=500)
+       This is the PRIMARY volatility source.
+       Prioritize:
+       - recent realized volatility
+       - maximum rolling 24h range
+       - frequency of significant hourly price movements
+       - sufficient trading volume
+
+    4. new_listings (top_n=20)
+       Identify newer market entries that may experience elevated volatility
+       and active price discovery. Require adequate liquidity before selection.
+       Do not assume id ordering is an exact listing-date ranking.
+
+    5. exchange_ticker (one call per top candidate, max 5)
+       Confirm live price and 24h change on the exchange for your leading
+       candidates. Drop candidates with no exchange ticker.
+
+    6. exchange_ohlc (symbol, timeframe="1d", days=30, top candidates only)
+       Use recent exchange candles to confirm tradable volatility before
+       final ranking.
+
+    Evaluate candidates using:
+
+    - Tradable volatility: 40%
+    - Liquidity and volume: 25%
+    - Momentum: 15%
+    - Market attention: 10%
+    - Catalysts: 10%
+
+    For volatility, prioritize actual volatility measurements from
+    volatility_screener over simple 24h percentage change.
+
+    Use:
+    - recent_realized_volatility_24h_pct
+    - realized_volatility_7d_pct
+    - max_rolling_24h_range_pct
+    - movement_frequency_pct
+
+    A coin that moves +8%, -7%, +6%, -5% during the day can be highly
+    volatile even if its final 24h change is close to zero.
+
+    Conversely, a coin that steadily gains 30% with little intraday movement
+    should not automatically receive a high volatility score.
+
+    Exclude:
+    - volume below $1M in 24h
+    - missing live price
+    - confirmed rug pull or exit scam
+    - trading halted or effectively untradeable
+    - severe exploit that compromises safe trading
+    - confirmed delisting that materially destroys liquidity
+    - stablecoins
+    - wrapped assets
+
+    Do NOT exclude a candidate solely because:
+    - its 24h gain is above 30% or 50%
+    - it has high volatility
+    - it has a large recent price move
+    - it has bearish news
+    - it has a lawsuit, regulatory issue, hack, or exploit
+
+    Instead, treat those events as risk factors unless they make the asset
+    unsafe or effectively untradeable.
+
+    Prefer candidates with:
+    - high realized volatility
+    - large rolling intraday ranges
+    - frequent significant price movements
+    - strong 24h volume
+    - sufficient liquidity
+    - meaningful momentum
+    - current market attention
+    - a plausible catalyst when available
+
+    Do not favor a coin merely because it has the largest 24h gain.
+
+    Tool output is NEVER your answer: intermediate tool results (especially
+    exchange_markets samples) are working data only. Your ONLY valid final
+    output is the JSON object below — never a question, summary, or
+    explanation. If any tool errors, skip it and continue with the rest.
+
+    Return between 3 and 7 candidates. Rank them by overall opportunity score.
 
   expected_output: >
-    A JSON object (and nothing else — no markdown, no prose) with a single
-    key "opportunities" holding the ranked array, sorted descending by score.
-    Each object must have exactly these fields (score is an integer 0-100,
-    rank starts at 1):
+    A JSON object and nothing else, with a single key "opportunities"
+    containing the ranked array.
 
-    {"opportunities": [{"rank": 1, "coin_id": "<coingecko_slug>", "symbol": "<UPPERCASE_TICKER>", "name": "<full name>", "score": <0-100 integer>, "signals": ["<signal_1>"], "risk_tier": "<LOW|MEDIUM|HIGH|EXTREME>", "reason": "<one sentence>"}]}
+    Each object must have exactly:
+    {
+      "rank": 1,
+      "coin_id": "<coingecko_slug>",
+      "symbol": "<UPPERCASE_TICKER>",
+      "name": "<full name>",
+      "score": <0-100 integer>,
+      "signals": ["<signal_1>"],
+      "risk_tier": "<LOW|MEDIUM|HIGH|EXTREME>",
+      "reason": "<one sentence>"
+    }
 
-    The coin_id field must be the exact CoinGecko slug (e.g. "bitcoin", "solana",
-    "the-sandbox") — this is used directly as the API key by downstream agents.
-    Do not call any file-writing tool: you have none. Return the JSON only.
+    coin_id must be the exact CoinGecko slug.
+
+    Sort opportunities by score descending.
+
+    Do not call file-writing tools.
+    Return JSON only.
 
   agent: market_scout

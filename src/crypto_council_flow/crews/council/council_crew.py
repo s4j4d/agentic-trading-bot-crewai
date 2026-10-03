@@ -31,11 +31,11 @@ import re
 from pathlib import Path
 from typing import Any
 
-from crewai import Agent, Crew, Process, Task
+from crewai import Agent, Crew, Memory, Process, Task
 from crewai.agents.agent_builder.base_agent import BaseAgent
 from crewai.project import CrewBase, agent, crew, task
 from crewai.skills.loader import load_skill
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from crypto_council_flow.tools.technical_indicators import (
     ATRTool,
@@ -61,8 +61,48 @@ from crypto_council_flow.tools.scout_tools import (
     NewListingsTool,
     TrendingCoinsTool,
     UpcomingCatalystsTool,
+    VolatilityScreenerTool,
+)
+from crypto_council_flow.tools.exchange_base import (
+    ExchangeMarketsTool,
+    ExchangeOHLCTool,
+    ExchangeTickerTool,
+)
+from crypto_council_flow.tools.portfolio_tools import (
+    PortfolioExposureTool,
+    RebalanceAllocatorTool,
 )
 
+embedder = {
+    "provider": "ollama",
+    "config": {
+        "model": "nomic-embed-text",
+        "url": "http://localhost:11434/api/embeddings"
+    }
+}
+
+memory = Memory(
+    llm="ollama/qwen3:14b",
+
+    embedder={
+        "provider": "ollama",
+        "config": {
+            "model_name": "nomic-embed-text",
+            "url": "http://localhost:11434/api/embeddings",
+        },
+    },
+
+    # Don't perform expensive similarity consolidation on every save
+    consolidation_threshold=1.0,
+
+    # Don't retrieve excessive amounts of memory
+    confidence_threshold_high=0.8,
+    exploration_budget=0,
+
+    # Don't let normal queries trigger unnecessary analysis
+    query_analysis_threshold=1000,
+    storage="./memory"
+)
 
 _CONFIG_DIR = Path(__file__).parent / "config"
 _SKILLS_DIR = Path(__file__).parent / "skills"
@@ -120,10 +160,13 @@ def _load_agent_skill(skill_dir_name: str) -> list:
 
 def _scout_tools() -> list:
     return [
+        ExchangeMarketsTool(),
+        ExchangeTickerTool(),
+        ExchangeOHLCTool(),
         TrendingCoinsTool(),
         MomentumScreenerTool(),
         NewListingsTool(),
-        UpcomingCatalystsTool(),
+        VolatilityScreenerTool()
     ]
 
 
@@ -139,13 +182,24 @@ def _risk_tools() -> list:
     return [PositionSizingTool(), LiquidationPriceTool(), PortfolioVaRTool(), AssetCorrelationTool()]
 
 
+def _portfolio_tools() -> list:
+    return [PortfolioExposureTool(), RebalanceAllocatorTool()]
+
+
 # ---------------------------------------------------------------------------
 # Structured scout output — parsed by Flow from result.pydantic, no raw JSON
 # parsing and no file roundtrip (agent has no write_file tool).
 # ---------------------------------------------------------------------------
 
 class ScoutOpportunity(BaseModel):
-    rank: int
+    """Single canonical DTO for scout output.
+
+    CrewAI's output validation works against exactly these 8 fields.
+    A ``model_validator(mode=\"before\")`` normalises any LLM field-name
+    variants into this canonical shape *before* validation, so each record
+    always ends up with the single required DTO — two DTOs are never valid.
+    """
+    rank: int = 0  # positional; defaults when the LLM omits it
     coin_id: str
     symbol: str
     name: str
@@ -153,6 +207,55 @@ class ScoutOpportunity(BaseModel):
     signals: list[str] = Field(default_factory=list)
     risk_tier: str = "MEDIUM"
     reason: str = ""
+
+    model_config = {"extra": "ignore"}
+
+    @model_validator(mode="before")
+    @classmethod
+    def _normalise_aliases(cls, data: object) -> object:
+        if not isinstance(data, dict):
+            return data
+        d = dict(data)
+
+        # coin_id aliases
+        if not d.get("coin_id") and d.get("coingecko_id"):
+            d["coin_id"] = d["coingecko_id"]
+
+        # symbol aliases — also extract from "Name (SYM)" combined format
+        if not d.get("symbol"):
+            if d.get("ticker"):
+                d["symbol"] = d["ticker"]
+            elif isinstance(d.get("coin"), str) and "(" in d["coin"]:
+                inside = d["coin"].split("(")[-1].rstrip(")").strip()
+                if inside.isalpha() and len(inside) <= 6:
+                    d["symbol"] = inside.upper()
+
+        # name aliases — strip "(SYM)" suffix from combined format
+        if not d.get("name") and isinstance(d.get("coin"), str):
+            d["name"] = d["coin"].split("(")[0].strip() or d["coin"]
+
+        # score aliases — also handle 0-1 float weighted_score → 0-100 int
+        if d.get("score") is None and d.get("weighted_score") is not None:
+            raw = d["weighted_score"]
+            try:
+                raw = float(raw)
+                d["score"] = int(round(raw * 100)) if 0 <= raw <= 1 else int(round(raw))
+            except (TypeError, ValueError):
+                d["score"] = 50
+
+        # rank aliases
+        if d.get("rank") is None and d.get("rank_position") is not None:
+            d["rank"] = d["rank_position"]
+        # default positional rank when the LLM omits numbering entirely
+        if d.get("rank") is None:
+            d["rank"] = 0
+
+        # coin_id fallback — resolve from symbol via a lightweight lookup
+        if not d.get("coin_id"):
+            sym = (d.get("symbol") or "").upper()
+            d["coin_id"] = {"BTC": "bitcoin", "ETH": "ethereum", "SOL": "solana"}.get(sym, (d.get("symbol") or "").lower().replace(" ", "-"))
+
+        return d
 
 
 class ScoutShortlist(BaseModel):
@@ -183,7 +286,10 @@ class CouncilScoutCrew:
             skills=_load_agent_skill("market-scout") or None,
             verbose=cfg.get("verbose", True),
             allow_delegation=cfg.get("allow_delegation", False),
-            reasoning=cfg.get("reasoning", True),
+            reasoning=False,
+            max_iter=15,
+            max_retry_limit=2,
+            max_rpm=1
         )
 
     @task
@@ -193,6 +299,8 @@ class CouncilScoutCrew:
             output_pydantic=ScoutShortlist,
         )
 
+    
+
     @crew
     def crew(self) -> Crew:
         """Scout-only crew: single agent, single task."""
@@ -200,7 +308,9 @@ class CouncilScoutCrew:
             agents=self.agents,
             tasks=self.tasks,
             process=Process.sequential,
+            memory=memory,
             verbose=True,
+            embedder=embedder
         )
 
 
@@ -218,7 +328,8 @@ class CouncilAnalysisCrew:
         coin_id         — CoinGecko slug, e.g. "solana"
         vs_currency     — quote currency, e.g. "usd"
         period          — RSI period, e.g. 14
-        account_size_usd — account size in USD, e.g. 10000
+        account_size    — account size, e.g. 10000
+        base_currency   — currency label, e.g. "toman"
     """
 
     agents: list[BaseAgent]
@@ -237,7 +348,8 @@ class CouncilAnalysisCrew:
             skills=_load_agent_skill("technical-analyst") or None,
             verbose=cfg.get("verbose", True),
             allow_delegation=cfg.get("allow_delegation", False),
-            reasoning=cfg.get("reasoning", True),
+#            reasoning=cfg.get("reasoning", True),
+            reasoning=False,
         )
 
     @agent
@@ -250,8 +362,8 @@ class CouncilAnalysisCrew:
             tools=_sentiment_tools(),
             skills=_load_agent_skill("sentiment-analyst") or None,
             verbose=cfg.get("verbose", True),
-            allow_delegation=cfg.get("allow_delegation", False),
-            reasoning=cfg.get("reasoning", True),
+#            reasoning=cfg.get("reasoning", True),
+            reasoning=False,
         )
 
     @agent
@@ -265,7 +377,9 @@ class CouncilAnalysisCrew:
             skills=_load_agent_skill("risk-manager") or None,
             verbose=cfg.get("verbose", True),
             allow_delegation=cfg.get("allow_delegation", False),
-            reasoning=cfg.get("reasoning", True),
+            reasoning=False,
+            max_iter=3,
+            max_retry_limit=2
         )
 
     @task
@@ -294,4 +408,159 @@ class CouncilAnalysisCrew:
             tasks=self.tasks,
             process=Process.sequential,
             verbose=True,
+            memory=memory,
+            embedder=embedder
+        )
+
+
+# ---------------------------------------------------------------------------
+# Portfolio DTOs — single canonical shape, alias normalisation
+# ---------------------------------------------------------------------------
+
+class PortfolioAction(BaseModel):
+    """One per-coin rebalance action. One DTO, never two."""
+
+    coin_id: str = ""
+    symbol: str = ""
+    action: str = "hold"
+    current: float = 0.0
+    target: float = 0.0
+    reason: str = ""
+
+    model_config = {"extra": "ignore"}
+
+    @model_validator(mode="before")
+    @classmethod
+    def _normalise_aliases(cls, data: object) -> object:
+        if not isinstance(data, dict):
+            return data
+        d = dict(data)
+
+        if not d.get("coin_id") and d.get("coingecko_id"):
+            d["coin_id"] = d["coingecko_id"]
+
+        if not d.get("symbol"):
+            if d.get("ticker"):
+                d["symbol"] = d["ticker"]
+            elif isinstance(d.get("coin"), str) and "(" in d["coin"]:
+                inside = d["coin"].split("(")[-1].rstrip(")").strip()
+                if inside.isalpha() and len(inside) <= 6:
+                    d["symbol"] = inside.upper()
+        if isinstance(d.get("symbol"), str):
+            d["symbol"] = d["symbol"].upper()
+
+        # action aliases — converge on the five canonical verbs
+        raw_action = str(d.get("action") or d.get("side") or "hold").lower().strip()
+        action_map = {
+            "buy": "open", "enter": "open", "long": "open",
+            "add": "increase", "scale_in": "increase",
+            "trim": "decrease", "reduce": "decrease", "scale_out": "decrease",
+            "sell": "close", "exit": "close", "flat": "close",
+        }
+        d["action"] = action_map.get(raw_action, raw_action)
+        if d["action"] not in ("open", "increase", "decrease", "close", "hold"):
+            d["action"] = "hold"
+
+        # amount aliases — canonical keys are current/target; legacy *_usd
+        # keys still parse so old LLM payloads and stored plans keep working
+        for key, fallbacks in (
+            ("current", ("current_usd", "current_base")),
+            ("target", ("target_usd", "target_base")),
+        ):
+            if d.get(key) is None:
+                for fb in fallbacks:
+                    if d.get(fb) is not None:
+                        d[key] = d[fb]
+                        break
+        if d.get("action") == "close":
+            d["target"] = 0.0
+
+        return d
+
+
+class PortfolioPlan(BaseModel):
+    """Cap-aware rebalance plan. Single canonical DTO for portfolio output."""
+
+    actions: list[PortfolioAction] = Field(default_factory=list)
+    total_target: float = 0.0
+    total_exposure_pct: float = 0.0
+    cash_remaining: float = 0.0
+    rationale: str = ""
+
+    model_config = {"extra": "ignore"}
+
+    @model_validator(mode="before")
+    @classmethod
+    def _normalise_aliases(cls, data: object) -> object:
+        if not isinstance(data, dict):
+            return data
+        d = dict(data)
+        # envelope aliases
+        if d.get("actions") is None:
+            for alt in ("plan", "allocations", "positions", "trades"):
+                if isinstance(d.get(alt), list):
+                    d["actions"] = d[alt]
+                    break
+        if isinstance(d.get("actions"), dict):
+            d["actions"] = list(d["actions"].values())
+        # amount aliases — legacy *_usd keys converge on the canonical shape
+        for key, fallbacks in (
+            ("total_target", ("total_target_usd",)),
+            ("cash_remaining", ("cash_remaining_usd",)),
+        ):
+            if d.get(key) is None:
+                for fb in fallbacks:
+                    if d.get(fb) is not None:
+                        d[key] = d[fb]
+                        break
+        return d
+
+
+# ---------------------------------------------------------------------------
+# Portfolio Crew  (portfolio_manager only)
+# ---------------------------------------------------------------------------
+
+@CrewBase
+class CouncilPortfolioCrew:
+    """Runs the portfolio_management_task only. Called after each analysis cycle."""
+
+    agents: list[BaseAgent]
+    tasks: list[Task]
+
+    tasks_config: str = "config/portfolio_tasks.yaml"
+
+    @agent
+    def portfolio_manager(self) -> Agent:
+        cfg = _AGENTS_DICT["portfolio_manager"]
+        return Agent(
+            role=cfg["role"],
+            goal=cfg["goal"],
+            backstory=cfg["backstory"],
+            tools=_portfolio_tools(),
+            skills=_load_agent_skill("portfolio-manager") or None,
+            verbose=cfg.get("verbose", True),
+            allow_delegation=cfg.get("allow_delegation", False),
+            reasoning=False,
+            max_iter=10,
+            max_retry_limit=0,
+            max_rpm=1,
+        )
+
+    @task
+    def portfolio_management_task(self) -> Task:
+        return Task(
+            config=self.tasks_config["portfolio_management_task"],  # type: ignore[index]
+            output_pydantic=PortfolioPlan,
+        )
+
+    @crew
+    def crew(self) -> Crew:
+        """Portfolio-only crew: single agent, single task."""
+        return Crew(
+            agents=self.agents,
+            tasks=self.tasks,
+            process=Process.sequential,
+            memory=memory,
+            verbose=True,
+            embedder=embedder
         )

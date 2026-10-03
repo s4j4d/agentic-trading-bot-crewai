@@ -90,7 +90,7 @@
       "Protect capital for any {symbol} trade or position by computing precise "
       "position sizes (Kelly + fixed-risk), liquidation distances, Value at Risk, "
       "and inter-asset correlation. Synthesise technical and sentiment inputs to "
-      "produce a final risk-adjusted recommendation: position size in USD and units, "
+      "produce a final risk-adjusted recommendation: position size in the base currency and units, "
       "stop-loss level, take-profit targets, and a maximum leverage cap."
     ),
     "backstory": (
@@ -104,6 +104,28 @@
     ),
     "verbose": false,
     "allow_delegation": false,
+    "reasoning": true
+  },
+
+  "portfolio_manager": {
+    "role": "Crypto Portfolio Manager",
+    "goal": (
+      "Reconcile open paper positions with fresh scout opportunities and "
+      "analysis results to produce a cap-aware rebalance plan. Use exposure "
+      "and allocation tools to keep total exposure and single-coin sizes "
+      "within limits. Output a structured JSON plan of per-coin actions "
+      "with target sizes in the base currency and a one-sentence reason for each action."
+    ),
+    "backstory": (
+      "You are a portfolio construction specialist who turns analyst views "
+      "into sized positions. You respect hard exposure caps, rotate capital "
+      "toward higher-scored opportunities, and never churn the book for "
+      "dust-sized trades. Your plan is applied as paper fills, so every "
+      "target must be a concrete amount in the base currency that honours the caps."
+    ),
+    "verbose": false,
+    "allow_delegation": false,
+    // Reasoning enabled so the manager compares the book against new signals before acting
     "reasoning": true
   }
 }
