@@ -350,6 +350,7 @@ class CouncilAnalysisCrew:
             allow_delegation=cfg.get("allow_delegation", False),
 #            reasoning=cfg.get("reasoning", True),
             reasoning=False,
+            max_execution_time=420,
         )
 
     @agent
@@ -364,6 +365,7 @@ class CouncilAnalysisCrew:
             verbose=cfg.get("verbose", True),
 #            reasoning=cfg.get("reasoning", True),
             reasoning=False,
+            max_execution_time=300,
         )
 
     @agent
@@ -379,7 +381,8 @@ class CouncilAnalysisCrew:
             allow_delegation=cfg.get("allow_delegation", False),
             reasoning=False,
             max_iter=3,
-            max_retry_limit=2
+            max_retry_limit=2,
+            max_execution_time=300,
         )
 
     @task
@@ -541,9 +544,10 @@ class CouncilPortfolioCrew:
             verbose=cfg.get("verbose", True),
             allow_delegation=cfg.get("allow_delegation", False),
             reasoning=False,
-            max_iter=10,
+            max_iter=5,
             max_retry_limit=0,
             max_rpm=1,
+            max_execution_time=300,
         )
 
     @task
