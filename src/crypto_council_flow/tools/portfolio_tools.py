@@ -1,12 +1,12 @@
-"""
-Portfolio tools for the portfolio_manager agent.
+"""Portfolio tools for the portfolio_manager agent.
 
 Deterministic, no network, no LLM:
-- PortfolioExposureTool    — exposure math + cap-breach flags
-- RebalanceAllocatorTool   — cap-aware target allocation weighted by score
+- PortfolioExposureTool    -- exposure math + cap-breach flags
+- RebalanceAllocatorTool   -- cap-aware target allocation weighted by score
+- RiskLevelsTool           -- ATR-based stop-loss / take-profit price levels
 
 All amounts are in the account's base currency (USD, toman, EUR, ...).
-The tools do no conversion — they treat numbers as plain amounts.
+The tools do no conversion -- they treat numbers as plain amounts.
 ``base_currency`` is a display label only, echoed back so the agent
 can name the currency in its reasons.
 """
@@ -333,6 +333,64 @@ class RebalanceAllocatorTool(BaseTool):
                 "total_exposure_pct": round(total_target / account_size * 100, 2),
                 "unallocated": round(total_budget - total_target, 2),
                 "allocations": allocations,
+            })
+        except Exception as exc:
+            return json.dumps({"error": str(exc)})
+
+
+# ---------------------------------------------------------------------------
+# Risk levels (stop-loss / take-profit)
+# ---------------------------------------------------------------------------
+
+class RiskLevelsInput(BaseModel):
+    coin_id: str = Field(..., description="CoinGecko coin ID.")
+    current_price: float = Field(..., gt=0, description="Current price in vs currency.")
+    atr_pct: float = Field(..., description="ATR as % of price (from atr_indicator).")
+    action: str = Field(
+        default="hold",
+        description="Portfolio action (open/increase/decrease/close/hold). Levels are identical for all actions (long spot).",
+    )
+
+
+class RiskLevelsTool(BaseTool):
+    name: str = "risk_levels"
+    description: str = (
+        "Computes deterministic stop-loss / take-profit price levels from ATR. "
+        "Stop is 1x ATR below price, take-profit is 2:1 reward-risk above. "
+        "Pure math, no network calls. Close actions get identical levels."
+    )
+    args_schema: Type[BaseModel] = RiskLevelsInput
+
+    def _run(
+        self,
+        coin_id: str = "",
+        current_price: float = 0.0,
+        atr_pct: float = 0.0,
+        action: str = "hold",
+    ) -> str:
+        try:
+            price = _safe_amount(current_price)
+            atr = _safe_amount(atr_pct)
+            if price <= 0 or atr <= 0:
+                return json.dumps({
+                    "coin_id": coin_id,
+                    "current_price": price,
+                    "atr_pct": atr,
+                    "stop_loss": None,
+                    "take_profit": None,
+                    "reward_risk": 2.0,
+                })
+            # Floor tiny ATR at 1% so stablecoins still get a guardrail.
+            eff_pct = max(atr, 1.0)
+            stop = round(price * (1 - eff_pct / 100), 6)
+            take = round(price * (1 + 2 * eff_pct / 100), 6)
+            return json.dumps({
+                "coin_id": coin_id,
+                "current_price": price,
+                "atr_pct": atr,
+                "stop_loss": stop,
+                "take_profit": take,
+                "reward_risk": 2.0,
             })
         except Exception as exc:
             return json.dumps({"error": str(exc)})

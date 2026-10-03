@@ -71,6 +71,7 @@ from crypto_council_flow.tools.exchange_base import (
 from crypto_council_flow.tools.portfolio_tools import (
     PortfolioExposureTool,
     RebalanceAllocatorTool,
+    RiskLevelsTool,
 )
 
 embedder = {
@@ -183,7 +184,7 @@ def _risk_tools() -> list:
 
 
 def _portfolio_tools() -> list:
-    return [PortfolioExposureTool(), RebalanceAllocatorTool()]
+    return [PortfolioExposureTool(), RebalanceAllocatorTool(), RiskLevelsTool()]
 
 
 # ---------------------------------------------------------------------------
@@ -430,6 +431,8 @@ class PortfolioAction(BaseModel):
     current: float = 0.0
     target: float = 0.0
     reason: str = ""
+    stop_loss: float | None = None
+    take_profit: float | None = None
 
     model_config = {"extra": "ignore"}
 
@@ -478,6 +481,17 @@ class PortfolioAction(BaseModel):
                         break
         if d.get("action") == "close":
             d["target"] = 0.0
+
+        # risk-level aliases — junk ("" / "n/a" / non-numeric) becomes None
+        # so LLM free-text never breaks PortfolioAction validation
+        for key in ("stop_loss", "take_profit"):
+            val = d.get(key)
+            if val is None:
+                continue
+            try:
+                d[key] = float(val)
+            except (TypeError, ValueError):
+                d[key] = None
 
         return d
 

@@ -103,6 +103,16 @@ def _sparkline(values: list[float], width: int = 560, height: int = 120) -> str:
     )
 
 
+def _lvl(v) -> str:
+    """Render a stop/take price level; '—' when null or junk."""
+    if v is None:
+        return "—"
+    try:
+        return _esc(str(float(v)))
+    except (TypeError, ValueError):
+        return "—"
+
+
 def _action_class(action: str) -> str:
     return {
         "open": "buy", "increase": "buy",
@@ -178,6 +188,8 @@ def build() -> str:
             f"<td class='num'>{tgt:,.0f}</td>"
             f"<td class='num {d_cls}'>{d_txt}</td>"
             f"<td class='num'>{(tgt / account * 100 if account else 0):.1f}%</td>"
+            f"<td class='num'>{_lvl(a.get('stop_loss'))}</td>"
+            f"<td class='num'>{_lvl(a.get('take_profit'))}</td>"
             f"<td class='num'>{_esc(score_by_coin.get(a.get('coin_id', ''), '—'))}</td>"
             f"<td class='reason'>{_esc(a.get('reason', ''))}</td>"
             "</tr>"
@@ -185,11 +197,12 @@ def build() -> str:
     positions = (
         "<div class='card'><h2>Positions — cycle #%s</h2>" % _esc(cycle)
         + "<table><thead><tr><th>Coin</th><th>Action</th><th>Current</th>"
-        "<th>Target</th><th>Delta</th><th>Acct %</th><th>Score</th><th>Why</th>"
+        "<th>Target</th><th>Delta</th><th>Acct %</th><th>Stop</th><th>Take</th><th>Score</th><th>Why</th>"
         "</tr></thead><tbody>"
-        + ("".join(rows) if rows else "<tr><td colspan=8>No actions in plan.</td></tr>")
+        + ("".join(rows) if rows else "<tr><td colspan=10>No actions in plan.</td></tr>")
         + "</tbody></table>"
-        + f"<p class='muted'>Amounts in {cur}. Delta = rebalance flow (target − current), not profit.</p></div>"
+        + f"<p class='muted'>Amounts in {cur}. Delta = rebalance flow (target − current), not profit. "
+        "Stop/Take = 1x-ATR stop-loss and 2:1 take-profit price levels (vs currency), informational — no orders are placed.</p></div>"
     )
 
     # --- P&L honesty box ---

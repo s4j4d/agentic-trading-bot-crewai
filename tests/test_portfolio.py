@@ -276,6 +276,51 @@ class TestPortfolioPlanDTO:
         })
         assert action.action == "hold"
 
+    def test_action_carries_optional_risk_levels(self):
+        from crypto_council_flow.crews.council.council_crew import PortfolioAction
+
+        action = PortfolioAction.model_validate({
+            "coin_id": "solana", "symbol": "SOL", "action": "open",
+            "current": 0.0, "target": 1500.0, "reason": "Top score.",
+            "stop_loss": 97.5, "take_profit": 105.0,
+        })
+        assert action.stop_loss == 97.5
+        assert action.take_profit == 105.0
+
+    def test_action_levels_default_to_none(self):
+        from crypto_council_flow.crews.council.council_crew import PortfolioAction
+
+        action = PortfolioAction.model_validate({
+            "coin_id": "solana", "symbol": "SOL", "action": "hold",
+            "current": 100.0, "target": 100.0, "reason": "Wait.",
+        })
+        assert action.stop_loss is None
+        assert action.take_profit is None
+
+    def test_action_junk_levels_become_none(self):
+        from crypto_council_flow.crews.council.council_crew import PortfolioAction
+
+        action = PortfolioAction.model_validate({
+            "coin_id": "solana", "symbol": "SOL", "action": "open",
+            "current": 0.0, "target": 1500.0, "reason": "Top score.",
+            "stop_loss": "n/a", "take_profit": "",
+        })
+        assert action.stop_loss is None
+        assert action.take_profit is None
+
+    def test_close_action_keeps_levels(self):
+        from crypto_council_flow.crews.council.council_crew import PortfolioAction
+
+        action = PortfolioAction.model_validate({
+            "coin_id": "solana", "symbol": "SOL", "action": "close",
+            "current": 500.0, "target": 500.0, "reason": "Stale.",
+            "stop_loss": 97.5, "take_profit": 105.0,
+        })
+        assert action.action == "close"
+        assert action.target == 0.0  # close still forces 0
+        assert action.stop_loss == 97.5
+        assert action.take_profit == 105.0
+
 
 # ---------------------------------------------------------------------------
 # Slice 4: CouncilPortfolioCrew wiring
@@ -300,7 +345,7 @@ class TestCouncilPortfolioCrew:
         crew = CouncilPortfolioCrew().crew()
         (agent,) = crew.agents
         tool_names = sorted(t.name for t in (agent.tools or []))
-        assert tool_names == ["portfolio_exposure", "rebalance_allocator"]
+        assert tool_names == ["portfolio_exposure", "rebalance_allocator", "risk_levels"]
 
     def test_portfolio_task_config_renders(self):
         from crypto_council_flow.crews.council.council_crew import CouncilPortfolioCrew

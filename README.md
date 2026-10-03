@@ -39,7 +39,7 @@ retried on the next tick.
 | `technical_analyst` | Chart + indicator read per coin | `RSI`, `MACD`, `BollingerBands`, `EMA-Cross`, `ATR` (shared 15-min OHLC cache, 6s CoinGecko throttle) |
 | `sentiment_analyst` | Market psychology per coin | `FearGreedIndex`, `CryptoNews`, `CommunitySentiment`, `MarketDominance` |
 | `risk_manager` | Position sizing, VaR, trade plan | `PositionSizing` (Kelly + fixed-risk), `LiquidationPrice`, `PortfolioVaR`, `AssetCorrelation` |
-| `portfolio_manager` | Cap-aware rebalance plan (paper) | `PortfolioExposureTool`, `RebalanceAllocatorTool` (score-weighted pro-rata, single/total caps, $10 dust → hold, exit candidates → close) |
+| `portfolio_manager` | Cap-aware rebalance plan (paper) | `PortfolioExposureTool`, `RebalanceAllocatorTool` (score-weighted pro-rata, single/total caps, $10 dust → hold, exit candidates → close), `RiskLevelsTool` (1×-ATR stop-loss + 2:1 take-profit price levels, close actions included, informational — no orders placed) |
 
 Design rules: one canonical Pydantic DTO per domain with `before`-validators
 that normalise LLM field drift; deterministic math lives in tools (no network,

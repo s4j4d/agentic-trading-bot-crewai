@@ -22,6 +22,10 @@ portfolio_management_task:
     of CoinGecko slugs):
     {analysed_coins_json}
 
+    ATR snapshot for deterministic risk levels (JSON object mapping
+    coin_id to {{"current_price", "atr_pct"}}):
+    {risk_levels_json}
+
     Only coins in the opportunities list are eligible for new or increased
     exposure. Entries whose reason mentions "carried with neutral score"
     are current book holdings the scout dropped this cycle — judge them on
@@ -39,6 +43,11 @@ portfolio_management_task:
     2. Rebalance Allocator — pass the opportunities (coin_id + score), the open
        positions, the account size, base currency, both caps, and min_trade of
        10.0 to get score-weighted, cap-aware targets.
+    3. Risk Levels — for EVERY action (open/increase/decrease/close/hold),
+       call risk_levels with that coin's current_price and atr_pct from the
+       ATR snapshot above (1x-ATR stop, 2:1 take-profit; close actions get
+       identical informational levels). A coin with no snapshot entry keeps
+       null levels — never invent volatility numbers.
 
     Adopt the allocator targets as the plan unless a vetting rule above forces
     a reduction — if you deviate, state exactly why in that action's reason.
@@ -55,6 +64,8 @@ portfolio_management_task:
       "action": "<open|increase|decrease|close|hold>",
       "current": <number>,
       "target": <number>,
+      "stop_loss": <number|null>,
+      "take_profit": <number|null>,
       "reason": "<one sentence>"
     }
 

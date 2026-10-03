@@ -57,6 +57,7 @@ from crypto_council_flow.crews.council.council_crew import (
     PortfolioAction,
     PortfolioPlan,
 )
+from crypto_council_flow.tools.technical_indicators import _fetch_ohlcv
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -153,6 +154,7 @@ class CryptoCouncilState(BaseModel):
     last_analysis_utc: str = ""
     analysis_reports: dict[str, str] = Field(default_factory=dict)  # coin_id → report path
     analysed_coins: list[str] = Field(default_factory=list)  # coin_ids with completed analysis this cycle
+    last_risk_levels: dict[str, dict[str, float]] = Field(default_factory=dict)  # ATR snapshot {current_price, atr_pct} per coin for deterministic SL/TP backfill
 
     # Portfolio management — refreshed after each analysis cycle
     portfolio_plan: dict[str, Any] = Field(default_factory=dict)  # last PortfolioPlan dump
@@ -478,6 +480,20 @@ class CryptoCouncilFlow(Flow[CryptoCouncilState]):
 
         analysed_coins_json = self.state.analysed_coins.copy()
 
+        # ATR snapshot (choice A: cache reuse) feeding risk_levels_json and
+        # the deterministic backfill below. Same (coin, vs, days) key the
+        # analysis ATR tool already fetched -> cache hit, zero new calls.
+        risk_snapshot: dict[str, dict[str, float]] = {}
+        for entry in opportunities_json + [
+            {"coin_id": pos["coin_id"]} for pos in open_positions
+        ]:
+            coin = entry.get("coin_id", "")
+            if coin and coin not in risk_snapshot:
+                price, atr = _atr_snapshot_for(coin)
+                if price is not None and atr is not None:
+                    risk_snapshot[coin] = {"current_price": price, "atr_pct": atr}
+        self.state.last_risk_levels = risk_snapshot
+
         try:
             result = CouncilPortfolioCrew().crew().kickoff(
                 inputs={
@@ -488,6 +504,7 @@ class CryptoCouncilFlow(Flow[CryptoCouncilState]):
                     "open_positions_json": json.dumps(open_positions),
                     "opportunities_json": json.dumps(opportunities_json),
                     "analysed_coins_json": json.dumps(analysed_coins_json),
+                    "risk_levels_json": json.dumps(risk_snapshot),
                 }
             )
 
@@ -500,6 +517,12 @@ class CryptoCouncilFlow(Flow[CryptoCouncilState]):
             # Deterministic totals: never trust the crew's arithmetic.
             self.state.portfolio_plan = _recompute_portfolio_totals(
                 self.state.portfolio_plan, self.state.account_size
+            )
+
+            # Deterministic SL/TP backfill from the ATR snapshot (close
+            # actions included, informational). Totals pass through untouched.
+            self.state.portfolio_plan = _backfill_risk_levels(
+                self.state.portfolio_plan, risk_snapshot
             )
 
             self.state.last_portfolio_utc = datetime.now(timezone.utc).isoformat()
@@ -587,6 +610,98 @@ def _extract_portfolio_plan(raw_output: str) -> dict[str, Any]:
         if isinstance(parsed, dict) and "actions" in parsed:
             return parsed
     return {}
+
+
+def _risk_levels_for(
+    current_price: object, atr_pct: object
+) -> tuple[float | None, float | None]:
+    """Deterministic 1x-ATR stop + 2:1 take-profit (pure math, no network).
+
+    Floor: tiny ATR (<1%) uses 1% so stablecoins still get a guardrail.
+    Invalid (non-positive price or ATR) returns (None, None).
+    Close actions use identical levels — informational guardrails, not orders.
+    """
+    try:
+        price = float(current_price or 0.0)
+        atr = float(atr_pct or 0.0)
+    except (TypeError, ValueError):
+        return (None, None)
+    if price <= 0 or atr <= 0:
+        return (None, None)
+    eff_pct = max(atr, 1.0)
+    stop = round(price * (1 - eff_pct / 100), 6)
+    take = round(price * (1 + 2 * eff_pct / 100), 6)
+    return (stop, take)
+
+
+_ATR_SNAPSHOT_DAYS = 30  # same key the analysis ATR tool fetches -> cache hit
+_ATR_SNAPSHOT_PERIOD = 14  # Wilder smoothing period, mirrors ATRTool
+
+
+def _atr_snapshot_for(coin_id: str) -> tuple[float | None, float | None]:
+    """Retry-then-None ATR snapshot from cached OHLC (pure read, no LLM).
+
+    Uses the shared `_fetch_ohlcv` cache (choice A: cache reuse) with the
+    same (coin, vs, days) key the analysis ATR tool already fetched, so a
+    fresh cycle costs zero new network calls. Returns
+    (current_price, atr_pct); on empty data or fetch error (e.g. 429)
+    returns (None, None) and the backfill leaves levels null.
+    """
+    try:
+        ohlcv = _fetch_ohlcv(coin_id, DEFAULT_VS_CURRENCY, _ATR_SNAPSHOT_DAYS)
+    except Exception:
+        return (None, None)
+    if not ohlcv or len(ohlcv) < _ATR_SNAPSHOT_PERIOD + 1:
+        return (None, None)
+    try:
+        highs = [float(r[2]) for r in ohlcv]
+        lows = [float(r[3]) for r in ohlcv]
+        closes = [float(r[4]) for r in ohlcv]
+        trs = [
+            max(highs[i] - lows[i],
+                abs(highs[i] - closes[i - 1]),
+                abs(lows[i] - closes[i - 1]))
+            for i in range(1, len(closes))
+        ]
+        atr = sum(trs[:_ATR_SNAPSHOT_PERIOD]) / _ATR_SNAPSHOT_PERIOD
+        for v in trs[_ATR_SNAPSHOT_PERIOD:]:
+            atr = (atr * (_ATR_SNAPSHOT_PERIOD - 1) + v) / _ATR_SNAPSHOT_PERIOD
+        price = closes[-1]
+        if price <= 0:
+            return (None, None)
+        return (round(price, 6), round(atr / price * 100, 4))
+    except (TypeError, ValueError, IndexError):
+        return (None, None)
+
+
+def _backfill_risk_levels(
+    plan: dict[str, Any], snapshot: dict[str, dict[str, float]]
+) -> dict[str, Any]:
+    """Fill missing stop_loss/take_profit from the ATR snapshot (deterministic).
+
+    Existing crew-supplied levels are kept; coins without a snapshot entry
+    stay null. Close actions get identical informational levels (their
+    target stays 0) — guardrails for the paper record, not orders.
+    """
+    actions = plan.get("actions", []) if isinstance(plan, dict) else []
+    if not isinstance(actions, list):
+        return plan
+    for a in actions:
+        if not isinstance(a, dict):
+            continue
+        if a.get("stop_loss") is not None and a.get("take_profit") is not None:
+            continue
+        snap = snapshot.get(a.get("coin_id", "")) if isinstance(snapshot, dict) else None
+        if not isinstance(snap, dict):
+            a.setdefault("stop_loss", None)
+            a.setdefault("take_profit", None)
+            continue
+        stop, take = _risk_levels_for(snap.get("current_price"), snap.get("atr_pct"))
+        if a.get("stop_loss") is None:
+            a["stop_loss"] = stop
+        if a.get("take_profit") is None:
+            a["take_profit"] = take
+    return plan
 
 
 def _recompute_portfolio_totals(plan: dict[str, Any], account_size: float) -> dict[str, Any]:
