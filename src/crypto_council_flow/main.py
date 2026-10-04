@@ -143,8 +143,8 @@ class CryptoCouncilState(BaseModel):
     period: int = DEFAULT_RSI_PERIOD
 
     # Configurable caps (also supplied at kickoff or via CLI)
-    max_total_exposure_pct: float = 60.0
-    max_single_position_pct: float = 20.0
+    max_total_exposure_pct: float = 30.0
+    max_single_position_pct: float = 5.0
 
     # Analysis scope (plan Task 2; CLI flags are Task 1)
     max_coins: int = 10
@@ -159,6 +159,8 @@ class CryptoCouncilState(BaseModel):
     analysis_reports: dict[str, str] = Field(default_factory=dict)  # coin_id → report path
     analysed_coins: list[str] = Field(default_factory=list)  # coin_ids with completed analysis this cycle
     last_risk_levels: dict[str, dict[str, float]] = Field(default_factory=dict)  # ATR snapshot {current_price, atr_pct} per coin for deterministic SL/TP backfill
+    max_hold_days: int = 4  # force-close positions held longer than this
+    position_opened_utc: dict[str, str] = Field(default_factory=dict)  # coin_id → ISO ts first opened
 
     # Portfolio management — refreshed after each analysis cycle
     portfolio_plan: dict[str, Any] = Field(default_factory=dict)  # last PortfolioPlan dump
@@ -457,6 +459,18 @@ class CryptoCouncilFlow(Flow[CryptoCouncilState]):
             )
             return
 
+        # Record when positions were first opened so max_hold_days can age them.
+        now_utc = datetime.now(timezone.utc)
+        current_ids: set[str] = {
+            str(a.get("coin_id")) for a in open_positions if a.get("coin_id")
+        }
+        # Drop open-time entries for positions no longer held.
+        self.state.position_opened_utc = {
+            cid: iso for cid, iso in self.state.position_opened_utc.items() if cid in current_ids
+        }
+        for cid in current_ids:
+            self.state.position_opened_utc.setdefault(cid, now_utc.isoformat())
+
         self.state.portfolio_cycle += 1
         portfolio_start = time.perf_counter()
         print(
@@ -536,6 +550,17 @@ class CryptoCouncilFlow(Flow[CryptoCouncilState]):
             # actions included, informational). Totals pass through untouched.
             self.state.portfolio_plan = _backfill_risk_levels(
                 self.state.portfolio_plan, risk_snapshot
+            )
+
+            # Force-close positions that exceeded max_hold_days.
+            self.state.portfolio_plan = _apply_max_hold(
+                self.state.portfolio_plan,
+                self.state.position_opened_utc,
+                self.state.max_hold_days,
+                datetime.now(timezone.utc),
+            )
+            self.state.portfolio_plan = _recompute_portfolio_totals(
+                self.state.portfolio_plan, self.state.account_size
             )
 
             self.state.last_portfolio_utc = datetime.now(timezone.utc).isoformat()
@@ -642,8 +667,8 @@ def _risk_levels_for(
     if price <= 0 or atr <= 0:
         return (None, None)
     eff_pct = max(atr, 1.0)
-    stop = round(price * (1 - eff_pct / 100), 6)
-    take = round(price * (1 + 2 * eff_pct / 100), 6)
+    stop = round(price * (1 - (eff_pct * 0.5) / 100), 6)
+    take = round(price * (1 + (eff_pct) / 100), 6)
     return (stop, take)
 
 
@@ -687,6 +712,49 @@ def _atr_snapshot_for(coin_id: str) -> tuple[float | None, float | None]:
         return (None, None)
 
 
+def _apply_max_hold(
+    plan: dict[str, Any],
+    opened_utc: dict[str, str],
+    max_hold_days: int,
+    now: datetime,
+) -> dict[str, Any]:
+    """Force ``close`` on any positioned action held > max_hold_days.
+
+    Age is derived from ``opened_utc`` (ISO timestamp recorded when the
+    position was first opened). Actions with an unknown open time are
+    left alone — better to keep exposure than guess at age.
+    """
+    if not isinstance(plan, dict) or max_hold_days <= 0:
+        return plan
+    actions = plan.get("actions", [])
+    if not isinstance(actions, list):
+        return plan
+    for a in actions:
+        if not isinstance(a, dict):
+            continue
+        if a.get("action") == "close":
+            continue
+        target = a.get("target", 0) or 0
+        if target <= 0:
+            continue
+        opened_iso = opened_utc.get(a.get("coin_id", ""))
+        if not opened_iso:
+            continue
+        try:
+            opened = datetime.fromisoformat(opened_iso)
+        except ValueError:
+            continue
+        age_days = (now - opened).total_seconds() / 86400.0
+        if age_days > max_hold_days:
+            a["action"] = "close"
+            a["target"] = 0
+            a["current"] = a.get("current", 0)
+            a["notes"] = (a.get("notes", "") + f" [max_hold_days={max_hold_days} force-close]").strip()
+            a["stop_loss"] = None
+            a["take_profit"] = None
+    return plan
+
+
 def _backfill_risk_levels(
     plan: dict[str, Any], snapshot: dict[str, dict[str, float]]
 ) -> dict[str, Any]:
@@ -702,18 +770,17 @@ def _backfill_risk_levels(
     for a in actions:
         if not isinstance(a, dict):
             continue
-        if a.get("stop_loss") is not None and a.get("take_profit") is not None:
-            continue
         snap = snapshot.get(a.get("coin_id", "")) if isinstance(snapshot, dict) else None
         if not isinstance(snap, dict):
             a.setdefault("stop_loss", None)
             a.setdefault("take_profit", None)
             continue
+        # Deterministic ATR levels are AUTHORITATIVE — the crew may supply
+        # garbage free-text numbers (e.g. 10x off current price), so we
+        # always overwrite rather than trusting crew-supplied values.
         stop, take = _risk_levels_for(snap.get("current_price"), snap.get("atr_pct"))
-        if a.get("stop_loss") is None:
-            a["stop_loss"] = stop
-        if a.get("take_profit") is None:
-            a["take_profit"] = take
+        a["stop_loss"] = stop
+        a["take_profit"] = take
     return plan
 
 
@@ -825,8 +892,9 @@ def _parse_inputs(argv: list[str]) -> dict[str, Any]:
         "account_size": 10_000.0,
         "base_currency": "usd",
         "period": DEFAULT_RSI_PERIOD,
-        "max_total_exposure_pct": 60.0,
-        "max_single_position_pct": 20.0,
+        "max_total_exposure_pct": 30.0,
+        "max_single_position_pct": 5.0,
+        "max_hold_days": 4,
     }
     i = 1
     while i < len(argv):
@@ -861,6 +929,12 @@ def _parse_inputs(argv: list[str]) -> dict[str, Any]:
             except ValueError:
                 pass
             i += 2
+        elif arg in ("--max-hold-days", "--max_hold_days") and i + 1 < len(argv):
+            try:
+                inputs["max_hold_days"] = int(argv[i + 1])
+            except ValueError:
+                pass
+            i += 2
         else:
             i += 1
     return inputs
@@ -874,8 +948,9 @@ async def _run_async(
     account_size: float,
     period: int,
     run_once: bool = False,
-    max_total_exposure_pct: float = 60.0,
-    max_single_position_pct: float = 20.0,
+    max_total_exposure_pct: float = 30.0,
+    max_single_position_pct: float = 5.0,
+    max_hold_days: int = 4,
     base_currency: str = "usd",
 ) -> None:
     """
@@ -898,6 +973,7 @@ async def _run_async(
     flow.state.period = period
     flow.state.max_total_exposure_pct = max_total_exposure_pct
     flow.state.max_single_position_pct = max_single_position_pct
+    flow.state.max_hold_days = max_hold_days
 
     last_scout_time: float = 0.0        # force scout on first iteration
     last_analysis_time: float = 0.0     # force analysis on first iteration
@@ -978,8 +1054,9 @@ def kickoff() -> None:
             base_currency=inputs.get("base_currency", "usd"),
             period=inputs.get("period", DEFAULT_RSI_PERIOD),
             run_once=run_once,
-            max_total_exposure_pct=inputs.get("max_total_exposure_pct", 60.0),
-            max_single_position_pct=inputs.get("max_single_position_pct", 20.0),
+            max_total_exposure_pct=inputs.get("max_total_exposure_pct", 30.0),
+            max_single_position_pct=inputs.get("max_single_position_pct", 5.0),
+            max_hold_days=inputs.get("max_hold_days", 4),
         )
     )
 
