@@ -68,6 +68,7 @@ from crypto_council_flow.tools.exchange_base import (
     ExchangeMarketsTool,
     ExchangeOHLCTool,
     ExchangeTickerTool,
+    ExchangeBatchTickerTool,
 )
 from crypto_council_flow.tools.portfolio_tools import (
     PortfolioExposureTool,
@@ -169,6 +170,7 @@ def _scout_tools() -> list:
     return [
         ExchangeMarketsTool(),
         ExchangeTickerTool(),
+        ExchangeBatchTickerTool(),
         ExchangeOHLCTool(),
         TrendingCoinsTool(),
         MomentumScreenerTool(),

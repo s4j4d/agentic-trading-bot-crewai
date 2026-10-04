@@ -52,9 +52,10 @@ market_scout_task:
        and active price discovery. Require adequate liquidity before selection.
        Do not assume id ordering is an exact listing-date ranking.
 
-    5. exchange_ticker (one call per top candidate, max 3)
+    5. exchange_batch_ticker (one call with all top candidate symbols)
        Confirm live price and 24h change on the exchange for your leading
-       candidates. Drop candidates with no exchange ticker.
+       candidates in one concurrent call. Drop candidates with no exchange
+       ticker (they will have an error field in the result).
 
     6. exchange_ohlc (symbol, timeframe="1d", days=30, top candidates only)
        Use recent exchange candles to confirm tradable volatility before

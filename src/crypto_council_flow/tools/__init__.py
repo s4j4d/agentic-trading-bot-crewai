@@ -33,6 +33,7 @@ from crypto_council_flow.tools.scout_tools import (
 from crypto_council_flow.tools.exchange_base import (
     ExchangeMarketsTool,
     ExchangeTickerTool,
+    ExchangeBatchTickerTool,
     ExchangeOHLCTool,
 )
 from crypto_council_flow.tools.portfolio_tools import (
@@ -66,6 +67,7 @@ __all__ = [
     # Exchange market data (abstract, exchange-agnostic)
     "ExchangeMarketsTool",
     "ExchangeTickerTool",
+    "ExchangeBatchTickerTool",
     "ExchangeOHLCTool",
     # Portfolio management (paper)
     "PortfolioExposureTool",

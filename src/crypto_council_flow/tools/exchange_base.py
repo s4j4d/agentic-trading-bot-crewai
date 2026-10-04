@@ -282,6 +282,56 @@ class ExchangeTickerInput(BaseModel):
     symbol: str = Field(..., description="Exchange symbol, e.g. 'BTCUSDT'.")
 
 
+def _check_symbol(client, symbol: str) -> dict:
+    """Fetch one symbol's ticker; returns ticker dict or error info."""
+    try:
+        ticker = client.get_ticker(symbol)
+        if ticker is None:
+            return {"symbol": symbol, "error": "symbol not found"}
+        ticker["symbol"] = symbol
+        return {"symbol": symbol, "ticker": ticker}
+    except Exception as exc:
+        return {"symbol": symbol, "error": f"{type(exc).__name__}: {exc}"}
+
+
+class ExchangeBatchTickerInput(BaseModel):
+    symbols: list[str] = Field(
+        ..., description="List of exchange symbols, e.g. ['BTCUSDT', 'ETHUSDT']."
+    )
+
+
+class ExchangeBatchTickerTool(BaseTool):
+    """Fetch 24h tickers for multiple symbols concurrently. Coins not listed
+    on the exchange are returned with an error field instead of a ticker."""
+
+    name: str = "exchange_batch_ticker"
+    description: str = (
+        "Fetches 24h tickers for a list of symbols in one shot (concurrently). "
+        "Preferred over repeated exchange_ticker calls when checking several "
+        "candidates. Symbols not traded on the configured exchange are "
+        "reported as errors — treat them as ineligible."
+    )
+    args_schema: Type[BaseModel] = ExchangeBatchTickerInput
+
+    def _run(self, symbols: list[str]) -> str:
+        if not symbols:
+            return _error("symbols list is empty")
+        client = get_exchange_client()
+        # Fetch each symbol concurrently so N coins take ~one round-trip,
+        # not N sequential ones. One bad/unknown symbol never blocks the rest.
+        from concurrent.futures import ThreadPoolExecutor
+
+        with ThreadPoolExecutor(max_workers=min(len(symbols), 8)) as pool:
+            results = list(pool.map(lambda s: _check_symbol(client, s), symbols))
+        return json.dumps(
+            {
+                "source": f"{client.__class__.__name__}_batch_ticker",
+                "count": len(results),
+                "results": results,
+            }
+        )
+
+
 class ExchangeTickerTool(BaseTool):
     """Fetch 24h ticker for a specific symbol."""
 
@@ -365,5 +415,6 @@ __all__ = [
     "get_exchange_client",
     "ExchangeMarketsTool",
     "ExchangeTickerTool",
+    "ExchangeBatchTickerTool",
     "ExchangeOHLCTool",
 ]
