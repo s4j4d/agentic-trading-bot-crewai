@@ -157,6 +157,7 @@ class CryptoCouncilState(BaseModel):
     # Analysis tracking — refreshed every 5 minutes
     last_analysis_utc: str = ""
     analysis_reports: dict[str, str] = Field(default_factory=dict)  # coin_id → report path
+    analysis_verdicts: dict[str, str] = Field(default_factory=dict)  # coin_id → short excerpt of the analysis conclusion
     analysed_coins: list[str] = Field(default_factory=list)  # coin_ids with completed analysis this cycle
     last_risk_levels: dict[str, dict[str, float]] = Field(default_factory=dict)  # ATR snapshot {current_price, atr_pct} per coin for deterministic SL/TP backfill
     max_hold_days: int = 4  # force-close positions held longer than this
@@ -397,6 +398,7 @@ class CryptoCouncilFlow(Flow[CryptoCouncilState]):
             )
             report_path.write_text(report_content, encoding="utf-8")
             self.state.analysis_reports[coin_id] = str(report_path)
+            self.state.analysis_verdicts[coin_id] = _extract_verdict(raw_report)
             self.state.analysed_coins.append(coin_id)
             print(
                 f"    ✓ Report saved → {report_path} "
@@ -506,6 +508,10 @@ class CryptoCouncilFlow(Flow[CryptoCouncilState]):
                 })
 
         analysed_coins_json = self.state.analysed_coins.copy()
+        analysis_verdicts_json = {
+            cid: self.state.analysis_verdicts.get(cid, "")
+            for cid in analysed_coins_json
+        }
 
         # ATR snapshot (choice A: cache reuse) feeding risk_levels_json and
         # the deterministic backfill below. Same (coin, vs, days) key the
@@ -531,6 +537,7 @@ class CryptoCouncilFlow(Flow[CryptoCouncilState]):
                     "open_positions_json": json.dumps(open_positions),
                     "opportunities_json": json.dumps(opportunities_json),
                     "analysed_coins_json": json.dumps(analysed_coins_json),
+                    "analysis_verdicts_json": json.dumps(analysis_verdicts_json),
                     "risk_levels_json": json.dumps(risk_snapshot),
                 }
             )
@@ -835,6 +842,29 @@ def _extract_scout_items(raw_output: str) -> list[dict[str, Any]]:
         if isinstance(parsed, list) and all(isinstance(i, dict) for i in parsed):
             return parsed
     return []
+
+
+def _extract_verdict(raw_report: str, max_chars: int = 600) -> str:
+    """Pull a short verdict excerpt from the tail of an analysis report.
+
+    Risk/portfolio conclusions are normally stated at the end of the
+    report, so the tail is the most decision-relevant slice. Bounded to
+    max_chars to keep the portfolio kickoff payload small.
+    """
+    if not raw_report:
+        return ""
+    tail = raw_report.strip().splitlines()
+    kept: list[str] = []
+    total = 0
+    for line in reversed(tail):
+        if total + len(line) + 1 > max_chars:
+            break
+        kept.insert(0, line)
+        total += len(line) + 1
+    if kept:
+        return "\n".join(kept).strip()
+    # Degenerate case: one giant line — fall back to the raw tail slice.
+    return raw_report.strip()[-max_chars:]
 
 
 def _build_report(opportunity: CoinOpportunity, analysis_raw: str, duration_s: float = 0.0) -> str:

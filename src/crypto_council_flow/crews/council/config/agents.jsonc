@@ -33,7 +33,7 @@
     "verbose": false,
     "allow_delegation": false,
     // Reasoning enabled so the scout plans its scan before acting
-    "reasoning": true,
+    "reasoning": false,
     "max_reasoning_attempts":3
   },
 
@@ -58,7 +58,7 @@
     "verbose": false,
     "allow_delegation": false,
     // Reasoning enabled so the agent plans its indicator sequence before acting
-    "reasoning": true
+    "reasoning": false
   },
 
   "sentiment_analyst": {
@@ -81,7 +81,7 @@
     ),
     "verbose": false,
     "allow_delegation": false,
-    "reasoning": true
+    "reasoning": false
   },
 
   "risk_manager": {
@@ -104,7 +104,7 @@
     ),
     "verbose": false,
     "allow_delegation": false,
-    "reasoning": true
+    "reasoning": false
   },
 
   "portfolio_manager": {
@@ -126,6 +126,6 @@
     "verbose": false,
     "allow_delegation": false,
     // Reasoning enabled so the manager compares the book against new signals before acting
-    "reasoning": true
+    "reasoning": false
   }
 }

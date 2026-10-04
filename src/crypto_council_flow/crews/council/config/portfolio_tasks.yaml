@@ -22,6 +22,9 @@ portfolio_management_task:
     of CoinGecko slugs):
     {analysed_coins_json}
 
+    Per-coin analysis verdicts — your primary evidence for keep/trim/close:
+    {analysis_verdicts_json}
+
     ATR snapshot for deterministic risk levels (JSON object mapping
     coin_id to {{"current_price", "atr_pct"}}):
     {risk_levels_json}

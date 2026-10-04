@@ -293,11 +293,11 @@ class CouncilScoutCrew:
             skills=_load_agent_skill("market-scout") or None,
             verbose=cfg.get("verbose", True),
             allow_delegation=cfg.get("allow_delegation", False),
-            reasoning=False,
+            reasoning=cfg.get("reasoning", True),
             max_iter=8,
             max_retry_limit=2,
             max_rpm=1,
-            max_execution_time=300
+            max_execution_time=400
         )
 
     @task
@@ -356,8 +356,7 @@ class CouncilAnalysisCrew:
             skills=_load_agent_skill("technical-analyst") or None,
             verbose=cfg.get("verbose", True),
             allow_delegation=cfg.get("allow_delegation", False),
-#            reasoning=cfg.get("reasoning", True),
-            reasoning=False,
+            reasoning=cfg.get("reasoning", True),
             max_execution_time=420,
         )
 
@@ -371,8 +370,7 @@ class CouncilAnalysisCrew:
             tools=_sentiment_tools(),
             skills=_load_agent_skill("sentiment-analyst") or None,
             verbose=cfg.get("verbose", True),
-#            reasoning=cfg.get("reasoning", True),
-            reasoning=False,
+            reasoning=cfg.get("reasoning", True),
             max_execution_time=300,
         )
 
@@ -387,7 +385,7 @@ class CouncilAnalysisCrew:
             skills=_load_agent_skill("risk-manager") or None,
             verbose=cfg.get("verbose", True),
             allow_delegation=cfg.get("allow_delegation", False),
-            reasoning=False,
+            reasoning=cfg.get("reasoning", True),
             max_iter=3,
             max_retry_limit=2,
             max_execution_time=300,
@@ -564,7 +562,7 @@ class CouncilPortfolioCrew:
             skills=_load_agent_skill("portfolio-manager") or None,
             verbose=cfg.get("verbose", True),
             allow_delegation=cfg.get("allow_delegation", False),
-            reasoning=False,
+            reasoning=cfg.get("reasoning", True),
             max_iter=5,
             max_retry_limit=0,
             max_rpm=1,
