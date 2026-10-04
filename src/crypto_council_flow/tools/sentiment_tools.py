@@ -4,12 +4,16 @@ Sentiment analysis tools for the sentiment_analyst agent.
 Data sources:
 - CoinGecko public API (coin metadata, community data)
 - Alternative.me Fear & Greed Index API (free, no key)
-- CryptoPanic public news API (free tier, no key required for basic access)
+- Crypto news via RSS feeds (free, no key required)
 """
 
 from __future__ import annotations
 
 import json
+import os
+import re
+import xml.etree.ElementTree as ET
+from email.utils import parsedate_to_datetime
 from typing import Type
 
 import requests
@@ -20,7 +24,16 @@ from pydantic import BaseModel, Field
 _DEFAULT_TIMEOUT = 10  # seconds
 _COINGECKO_BASE = "https://api.coingecko.com/api/v3"
 _FEAR_GREED_URL = "https://api.alternative.me/fng/"
-_CRYPTOPANIC_URL = "https://newsdata.io/api/1/latest?apikey=pub_c111157bd75c4a9394c43bf276c0362a"
+
+# News endpoint(s).  Override with the CRYPTO_NEWS_SENTIMENT env var to swap
+# providers (e.g. a CryptoPanic/NewsData URL with your own key) without a code
+# change.  Defaults to free, key-less RSS feeds from major crypto outlets.
+_DEFAULT_NEWS_FEEDS = (
+    "https://cointelegraph.com/rss"
+    ",https://www.coindesk.com/arc/outboundfeeds/rss/"
+    ",https://decrypt.co/feed"
+)
+CRYPTO_NEWS_SENTIMENT = os.getenv("CRYPTO_NEWS_SENTIMENT", _DEFAULT_NEWS_FEEDS)
 
 
 # ---------------------------------------------------------------------------
@@ -167,6 +180,80 @@ class FearGreedIndexTool(BaseTool):
 # Crypto News Sentiment Tool
 # ---------------------------------------------------------------------------
 
+_COIN_ALIASES = {
+    "BTC": ["BTC", "BITCOIN"],
+    "ETH": ["ETH", "ETHEREUM"],
+    "SOL": ["SOL", "SOLANA"],
+    "BNB": ["BNB", "BINANCE"],
+    "XRP": ["XRP", "RIPPLE"],
+    "ADA": ["ADA", "CARDANO"],
+    "DOGE": ["DOGE", "DOGECOIN"],
+    "DOT": ["DOT", "POLKADOT"],
+    "AVAX": ["AVAX", "AVALANCHE"],
+    "MATIC": ["MATIC", "POLYGON"],
+    "LINK": ["LINK", "CHAINLINK"],
+    "LTC": ["LTC", "LITECOIN"],
+    "TRX": ["TRX", "TRON"],
+    "ATOM": ["ATOM", "COSMOS"],
+}
+
+_BULLISH_WORDS = re.compile(
+    r"\b(surge|soar|rally|gain|bull|bullish|record high|all-time high|adoption|"
+    r"approval|breakthrough|partnership|upgrade|launch|raise|pump)\b", re.I)
+_BEARISH_WORDS = re.compile(
+    r"\b(crash|plunge|drop|fall|bear|bearish|hack|exploit|ban|lawsuit|fraud|"
+    r"scam|investigation|bankrupt|liquidation|selloff|dump|decline|drop)\b", re.I)
+
+
+def _fetch_rss_items(feed_url: str) -> list[dict]:
+    """Fetch and parse a single RSS feed; returns a list of article dicts."""
+    resp = requests.get(
+        feed_url,
+        headers={"User-Agent": "crypto-council-flow/1.0"},
+        timeout=_DEFAULT_TIMEOUT,
+    )
+    resp.raise_for_status()
+    root = ET.fromstring(resp.content)
+    out = []
+    for item in root.findall(".//item"):
+        try:
+            published = item.findtext("pubDate", "")
+            try:
+                published_iso = parsedate_to_datetime(published).isoformat()
+            except Exception:
+                published_iso = published
+            link = item.findtext("link", "") or ""
+            domain = re.sub(r"^https?://(www\.)?", "", link).split("/")[0] if link else ""
+            out.append({
+                "title": (item.findtext("title") or "").strip(),
+                "description": re.sub(r"<[^>]+>", "", item.findtext("description") or "").strip(),
+                "published_at": published_iso,
+                "domain": domain,
+                "url": link,
+            })
+        except Exception:
+            continue
+    return out
+
+
+def _currency_matches(symbol: str, article: dict) -> bool:
+    """True if the article mentions the symbol or one of its known aliases."""
+    haystack = f"{article['title']} {article['description']}".upper()
+    aliases = _COIN_ALIASES.get(symbol.upper(), [symbol.upper()])
+    return any(re.search(rf"\b{re.escape(a)}\b", haystack) for a in aliases)
+
+
+def _headline_sentiment(text: str) -> str:
+    """Very lightweight keyword sentiment for a headline."""
+    bull = len(_BULLISH_WORDS.findall(text))
+    bear = len(_BEARISH_WORDS.findall(text))
+    if bull > bear:
+        return "bullish"
+    if bear > bull:
+        return "bearish"
+    return "neutral"
+
+
 class CryptoNewsInput(BaseModel):
     currencies: str = Field(
         default="BTC",
@@ -185,32 +272,35 @@ class CryptoNewsInput(BaseModel):
 class CryptoNewsTool(BaseTool):
     name: str = "crypto_news_sentiment"
     description: str = (
-        "Fetches recent crypto news headlines from CryptoPanic and analyzes sentiment. "
-        "Returns news titles, publication times, source domains, and vote counts (bullish/bearish). "
-        "Useful for understanding recent narrative shifts and market-moving events."
+        "Fetches recent crypto news headlines from RSS feeds (CoinTelegraph, "
+        "CoinDesk, Decrypt — configurable via CRYPTO_NEWS_SENTIMENT env var). "
+        "Returns news titles, publication times, source domains, and a "
+        "headline-keyword sentiment score. Useful for understanding recent "
+        "narrative shifts and market-moving events."
     )
     args_schema: Type[BaseModel] = CryptoNewsInput
 
     def _run(self, currencies: str = "BTC", filter_type: str = "hot", limit: int = 10) -> str:
         try:
-            # Endpoint accepts only the apikey (embedded in URL), no query params.
-            resp = requests.get(_CRYPTOPANIC_URL, timeout=_DEFAULT_TIMEOUT)
-            resp.raise_for_status()
-            data = resp.json()
-            all_results = data.get("results", [])
+            feeds = [u.strip() for u in CRYPTO_NEWS_SENTIMENT.split(",") if u.strip()]
+            articles: list[dict] = []
+            for feed_url in feeds:
+                articles.extend(_fetch_rss_items(feed_url))
 
-            # Client-side: filter by requested currencies and limit
+            # Filter by requested currencies (symbol or known name alias).
             if currencies:
                 wanted = {c.strip().upper() for c in currencies.split(",") if c.strip()}
-                all_results = [
-                    r for r in all_results
-                    if any(
-                        c.get("code", "").upper() in wanted
-                        for c in (r.get("currencies") or [])
-                    )
+                matched = [
+                    a for a in articles
+                    if any(_currency_matches(w, a) for w in wanted)
                 ]
-
-            results = all_results[:limit]
+                # Fall back to the full headline set so the tool still returns
+                # context when a ticker isn't mentioned in recent headlines.
+                results = matched[:limit] if matched else articles[:limit]
+                matched_any = bool(matched)
+            else:
+                results = articles[:limit]
+                matched_any = True
 
             if not results:
                 return json.dumps({
@@ -224,21 +314,19 @@ class CryptoNewsTool(BaseTool):
             bearish_count = 0
 
             for item in results:
-                votes = item.get("votes", {})
-                bull = votes.get("positive", 0) or 0
-                bear = votes.get("negative", 0) or 0
+                polarity = _headline_sentiment(item["title"] + " " + item["description"])
+                bull = 1 if polarity == "bullish" else 0
+                bear = 1 if polarity == "bearish" else 0
                 bullish_count += bull
                 bearish_count += bear
-
-                source = item.get("source", {})
                 items.append({
-                    "title": item.get("title", ""),
-                    "published_at": item.get("published_at", ""),
-                    "domain": source.get("domain", ""),
-                    "url": item.get("url", ""),
+                    "title": item["title"],
+                    "published_at": item["published_at"],
+                    "domain": item["domain"],
+                    "url": item["url"],
                     "bullish_votes": bull,
                     "bearish_votes": bear,
-                    "kind": item.get("kind", "news"),
+                    "kind": "news",
                 })
 
             total_votes = bullish_count + bearish_count
@@ -257,6 +345,7 @@ class CryptoNewsTool(BaseTool):
                 "bullish_votes": bullish_count,
                 "bearish_votes": bearish_count,
                 "sentiment_ratio": sentiment_ratio,
+                "matched_currency_filter": matched_any,
                 "items": items,
             })
         except requests.RequestException as exc:
