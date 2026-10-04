@@ -1,23 +1,24 @@
 technical_analysis_task:
   description: >
-    Perform a comprehensive technical analysis of {symbol} (CoinGecko ID: {coin_id})
+    Perform a focused technical analysis of {symbol} (CoinGecko ID: {coin_id})
     priced in {vs_currency}.
 
     Use your tools in this order:
     1. RSI ({period}-period) to assess momentum and overbought/oversold levels.
     2. MACD (12/26/9) to identify momentum crossovers.
-    3. Bollinger Bands (20-period, 2σ) to assess volatility regime and price position.
-    4. EMA Cross (9/21) to confirm short-term trend direction.
-    5. ATR (14-period) to quantify recent volatility and compute stop distances.
+    3. ATR (14-period) to quantify recent volatility and compute stop distances.
 
-    Synthesise all five indicators into a structured report covering:
+    Synthesise the three indicators into a structured report covering:
     - Primary trend (bullish / bearish / sideways)
     - Momentum state (accelerating / decelerating / reversing)
     - Volatility regime (squeeze / expansion / normalised)
-    - Key support level and key resistance level (derived from Bollinger midline,
-      EMAs, and recent price extremes from the data)
+    - Key support level and key resistance level (derived from EMAs,
+      and recent price extremes from the data)
     - Directional bias with confidence level (high / medium / low)
     - Suggested entry zone and invalidation level (1× ATR below/above entry)
+
+    Call each tool at most once. Do not retry successes. If a tool 429s,
+    use data already on hand and move on.
 
   expected_output: >
     A structured technical analysis report in the following format:
@@ -26,8 +27,6 @@ technical_analysis_task:
     **Trend:** [bullish|bearish|sideways]
     **Momentum (RSI {period}):** [value] — [overbought|oversold|neutral]
     **MACD Signal:** [crossover_signal]
-    **Bollinger Position:** [position] | Band Width: [band_width_pct]%
-    **EMA Cross (9/21):** [crossover] — [trend]
     **ATR (14):** [atr] ([atr_pct]%) — [volatility_level]
     **Key Support:** [value]
     **Key Resistance:** [value]
@@ -40,21 +39,22 @@ technical_analysis_task:
 
 sentiment_analysis_task:
   description: >
-    Conduct a full sentiment sweep for {symbol} (CoinGecko ID: {coin_id}) to
+    Conduct a focused sentiment sweep for {symbol} (CoinGecko ID: {coin_id}) to
     determine whether market psychology currently supports or undermines a trade.
 
     Execute the following in order:
     1. Fear & Greed Index (7-day history) — identify the current reading and trend.
-    2. Crypto news sentiment — fetch the top 10 hot news items for the symbol's
+    2. Crypto news sentiment — fetch the top 5 hot news items for the symbol's
        ticker (use the uppercase ticker, e.g. BTC for bitcoin) and assess the
        bullish/bearish vote distribution and dominant narrative themes.
-    3. Community sentiment — fetch Reddit subscribers, Twitter followers, dev
-       commits, and CoinGecko sentiment vote ratio for the coin_id.
-    4. Market dominance — get BTC dominance and total market cap change to
+    3. Market dominance — get BTC dominance and total market cap change to
        place the asset in macro context.
 
     Compute a composite sentiment score from 0 (extreme fear / bearish) to
     100 (extreme greed / bullish) and identify any sentiment-price divergences.
+
+    Call each tool at most once. Do not retry successes. If a tool 429s,
+    use data already on hand and move on.
 
   expected_output: >
     A structured sentiment report in the following format:
@@ -64,7 +64,6 @@ sentiment_analysis_task:
     **Fear & Greed Index:** [value] ([classification]) | 7-day trend: [trend]
     **News Sentiment:** [aggregate_sentiment] | Bullish votes: [n] / Bearish votes: [n]
     **Top Narrative Themes:** [bullet list of 3-5 themes from headlines]
-    **Community Health:** Twitter [n] followers | Reddit [n] subscribers | Dev commits 4w: [n]
     **Market Regime:** BTC dominance [pct]% — [regime]
     **Sentiment-Price Divergence:** [yes/no — explanation if yes]
     **Catalyst Flags:** [list any unusual news or extreme readings]
@@ -89,16 +88,17 @@ risk_assessment_task:
     1. Position Sizing — compute Kelly and fixed-risk position sizes using a
        win_rate of 0.55 and max_risk_pct of 2.0 for standard scenario,
        and max_risk_pct of 1.0 for conservative scenario.
-    2. Liquidation Price — calculate for both 2x and 5x leverage scenarios in a
-       single call (pass leverage_levels: [2, 5]) for the trade direction
+    2. Liquidation Price — calculate for 2x leverage scenario in a
+       single call (pass leverage_levels: [2]) for the trade direction
        (long or short depending on bias). Use maintenance_margin_rate of 0.005.
     3. Portfolio VaR — run historical VaR and CVaR for {coin_id} at 95% confidence
        with a position size matching the recommended standard position.
-    4. Asset Correlation — if the portfolio already holds BTC and the coin_id is
-       not "bitcoin", check correlation between {coin_id} and bitcoin over 90 days.
 
     Combine all risk metrics with the technical bias and sentiment score to
     produce the final trade recommendation.
+
+    Call each tool at most once. Do not retry successes. If a tool 429s,
+    use data already on hand and move on.
 
   expected_output: >
       A structured risk management report in the following format:
@@ -126,14 +126,12 @@ risk_assessment_task:
 
       ### Leverage Warning (if applicable)
       - 2x Liquidation Price: [price] {base_currency} ([pct]% from entry) — Risk: [level]
-      - 5x Liquidation Price: [price] {base_currency} ([pct]% from entry) — Risk: [level]
       - Maximum Recommended Leverage: [n]x
 
       ### Portfolio Risk Metrics
       - 1-Day VaR (95%): [pct]% / [amount] {base_currency}
       - 1-Day CVaR (95%): [pct]% / [amount] {base_currency}
       - Annualised Volatility: [pct]%
-      - BTC Correlation (90d): [value] — [relationship]
 
       ### Final Recommendation
       **Execute Trade:** [YES|NO|CONDITIONAL]
