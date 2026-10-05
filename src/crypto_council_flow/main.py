@@ -59,6 +59,49 @@ from crypto_council_flow.crews.council.council_crew import (
 )
 from crypto_council_flow.tools.technical_indicators import _fetch_ohlcv
 
+def _prefetch_scout_snapshot() -> str:
+    """Run the five independent scout tools concurrently and return their
+    results as one JSON object for injection into the scout task.
+    Exchange-dependent confirmation tools (batch_ticker/ticker/ohlc) are
+    NOT pre-fetched — the agent calls them after ranking candidates."""
+    from crypto_council_flow.crews.council.council_crew import (
+        _scout_tools,
+    )
+
+    tools_by_name = {t.name: t for t in _scout_tools()}
+    calls: list[tuple[str, str, dict[str, Any]]] = [
+        ("trending_coins", "trending_coins", {"top_n": 5}),
+        ("momentum_screener", "momentum_screener", {
+            "top_n": 10, "min_volume_usd": 5_000_000, "max_market_cap_rank": 500,
+        }),
+        ("volatility_screener", "volatility_screener", {
+            "top_n": 10, "min_volume_usd": 1_000_000, "max_market_cap_rank": 500,
+        }),
+        ("new_listings", "new_listings", {"top_n": 10}),
+        ("exchange_markets", "exchange_markets", {
+            "quote_currency": "usdt", "only_active": True, "max_results": 50,
+        }),
+    ]
+
+    def _call(key: str, tool_name: str, kwargs: dict[str, Any]) -> tuple[str, str]:
+        tool = tools_by_name.get(tool_name)
+        if tool is None:
+            return key, json.dumps({"error": f"tool {tool_name!r} unavailable"})
+        try:
+            return key, tool._run(**kwargs)
+        except Exception as exc:
+            return key, json.dumps({"error": f"{type(exc).__name__}: {exc}"})
+
+    results: dict[str, Any] = {}
+    with ThreadPoolExecutor(max_workers=len(calls)) as pool:
+        for key, raw in pool.map(lambda c: _call(*c), calls):
+            try:
+                results[key] = json.loads(raw) if isinstance(raw, str) else raw
+            except Exception:
+                results[key] = raw
+    return json.dumps(results, ensure_ascii=False)
+
+
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
@@ -256,7 +299,10 @@ class CryptoCouncilFlow(Flow[CryptoCouncilState]):
         )
 
         try:
-            result = CouncilScoutCrew().crew().kickoff()
+            scout_snapshot_json = _prefetch_scout_snapshot()
+            result = CouncilScoutCrew().crew().kickoff(
+                inputs={"scout_snapshot_json": scout_snapshot_json}
+            )
         except Exception as exc:
             self.state.last_scout_duration_s = time.perf_counter() - scout_start
             print(f"ERROR: Scout crew failed: {exc}. Keeping previous coin list.")
@@ -824,6 +870,7 @@ def _backfill_risk_levels(
         if not isinstance(cand, dict):
             a.setdefault("stop_loss", None)
             a.setdefault("take_profit", None)
+            a["sl_tp_source"] = "none"
             continue
 
         computed_stop, computed_take = _risk_levels_for(
@@ -842,9 +889,11 @@ def _backfill_risk_levels(
         if computed_stop is None or computed_take is None:
             if _sane_levels(crew_stop, crew_take, entry):
                 a["stop_loss"], a["take_profit"] = crew_stop, crew_take
+                a["sl_tp_source"] = "explicit"
             else:
                 a.setdefault("stop_loss", None)
                 a.setdefault("take_profit", None)
+                a["sl_tp_source"] = "none"
             continue
 
         keep_crew = (
@@ -852,9 +901,12 @@ def _backfill_risk_levels(
             and _within_pct(crew_stop, computed_stop, _within_pct_tolerance())
             and _within_pct(crew_take, computed_take, _within_pct_tolerance())
         )
-        if not keep_crew:
+        if keep_crew:
+            a["sl_tp_source"] = "explicit"
+        else:
             a["stop_loss"] = computed_stop
             a["take_profit"] = computed_take
+            a["sl_tp_source"] = "computed"
     return plan
 
 
