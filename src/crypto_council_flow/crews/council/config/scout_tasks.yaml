@@ -17,6 +17,14 @@ market_scout_task:
     After collecting the results, analyze the existing observations.
     Do not repeat successful tool calls.
 
+    ONE TOOL PER CALL — THIS IS A HARD RULE:
+    Every tool call must be a single, standalone JSON object containing the
+    arguments for exactly ONE tool. Never merge two tools into one call:
+    never concatenate two argument objects, never put two tool names in one
+    call, and never send `{"symbols": [...]}{"symbol": ...}` as one payload.
+    exchange_batch_ticker and exchange_ohlc take DIFFERENT arguments and must
+    be emitted as SEPARATE tool calls. If you need both, make two calls.
+
     A tool call is never a valid final answer. After the tool results are
     in, you MUST write out the final JSON object described below as plain
     text — do not finish with a function/tool call. If you are running out
@@ -66,15 +74,28 @@ market_scout_task:
 
     5. exchange_batch_ticker (one call with all top candidate symbols)
        Confirm live price and 24h change on the exchange for your leading
-       candidates in one concurrent call. Drop candidates with no exchange
-       ticker (they will have an error field in the result).
+       candidates in ONE call whose "symbols" argument is a JSON array of
+       exchange symbols, e.g. {"symbols": ["BTCUSDT", "ETHUSDT"]}.
+       Drop candidates with no exchange ticker (they will have an error
+       field in the result).
 
     6. exchange_ohlc (symbol, timeframe="1d", days=30, top candidates only)
-       Use recent exchange candles to confirm tradable volatility before
-       final ranking. Note: the downstream analysis and execution trade on
-       1-hour candles with a max hold of {max_hold_days} day(s), so prefer
-       coins with frequent significant hourly movements, not just multi-day
-       trends.
+       This is a DIFFERENT tool with a DIFFERENT argument shape: exactly one
+       "symbol" string per call, never a list. Call it once per finalist
+       you want to check — e.g. {"symbol": "BTCUSDT", "timeframe": "1d",
+       "days": 30}. Do NOT combine it with exchange_batch_ticker in the
+       same call. Use the recent exchange candles to confirm tradable
+       volatility before final ranking. Note: the downstream analysis and
+       execution trade on 1-hour candles with a max hold of {max_hold_days}
+       day(s), so prefer coins with frequent significant hourly movements,
+       not just multi-day trends.
+
+    Ordering / concurrency:
+    Steps 1-5 have no dependencies on each other and SHOULD be emitted
+    together in a SINGLE response. Steps 0 and 5 come first (markets, then
+    batch ticker). Step 6 DEPENDS on step 5's results, so it must be issued
+    in a LATER response, after the batch-ticker results have arrived —
+    never in the same batch as step 5.
 
     Evaluate candidates using:
 
