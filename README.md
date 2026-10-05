@@ -86,7 +86,7 @@ Useful flags for `--once`:
 
 ```bash
 python -m crypto_council_flow.main --once --account-size 5000000 --base-currency toman
-python -m crypto_council_flow.main --once --max-total-exposure 60 --max-single-position 20 --period 14
+python -m crypto_council_flow.main --once --max-total-exposure 60 --max-single-position 20 --rsi-period 14 --atr-period 14
 ```
 
 ## Outputs (`output/`, git-ignored)

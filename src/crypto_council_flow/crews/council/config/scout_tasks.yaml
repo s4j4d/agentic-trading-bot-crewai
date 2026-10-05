@@ -62,7 +62,10 @@ market_scout_task:
 
     6. exchange_ohlc (symbol, timeframe="1d", days=30, top candidates only)
        Use recent exchange candles to confirm tradable volatility before
-       final ranking.
+       final ranking. Note: the downstream analysis and execution trade on
+       1-hour candles with a max hold of {max_hold_days} day(s), so prefer
+       coins with frequent significant hourly movements, not just multi-day
+       trends.
 
     Evaluate candidates using:
 

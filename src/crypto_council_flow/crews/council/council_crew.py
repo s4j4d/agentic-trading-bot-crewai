@@ -338,6 +338,7 @@ class CouncilAnalysisCrew:
         coin_id         — CoinGecko slug, e.g. "solana"
         vs_currency     — quote currency, e.g. "usd"
         period          — RSI period, e.g. 14
+        atr_period      — ATR period, e.g. 14
         account_size    — account size, e.g. 10000
         base_currency   — currency label, e.g. "toman"
     """

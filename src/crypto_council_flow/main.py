@@ -65,9 +65,11 @@ from crypto_council_flow.tools.technical_indicators import _fetch_ohlcv
 
 SCOUT_INTERVAL_SECONDS: int = 2 * 60 * 60   # 2 hours
 ANALYSIS_INTERVAL_SECONDS: int = 5 * 60     # 5 minutes
+RISK_TICK_INTERVAL_SECONDS: int = 60        # deterministic SL/TP + max-hold, no LLM
 DEFAULT_VS_CURRENCY: str = "usd"
 DEFAULT_BASE_CURRENCY: str = "usd"
-DEFAULT_RSI_PERIOD: int = 14
+DEFAULT_RSI_PERIOD: int = int(os.getenv("COUNCIL_RSI_PERIOD", "14"))
+DEFAULT_ATR_PERIOD: int = int(os.getenv("COUNCIL_ATR_PERIOD", "14"))
 OUTPUT_DIR: Path = Path("output")
 CONSOLIDATED_RESULTS: Path = OUTPUT_DIR / "all_analysis_results.txt"
 LEDGER_PATH: Path = OUTPUT_DIR / "paper_ledger.json"
@@ -143,6 +145,7 @@ class CryptoCouncilState(BaseModel):
     account_size: float = 10_000.0
     base_currency: str = DEFAULT_BASE_CURRENCY
     period: int = DEFAULT_RSI_PERIOD
+    atr_period: int = DEFAULT_ATR_PERIOD
 
     # Configurable caps (also supplied at kickoff or via CLI)
     max_total_exposure_pct: float = 30.0
@@ -162,7 +165,9 @@ class CryptoCouncilState(BaseModel):
     analysis_verdicts: dict[str, str] = Field(default_factory=dict)  # coin_id → short excerpt of the analysis conclusion
     analysed_coins: list[str] = Field(default_factory=list)  # coin_ids with completed analysis this cycle
     last_risk_levels: dict[str, dict[str, float]] = Field(default_factory=dict)  # ATR snapshot {current_price, atr_pct} per coin for deterministic SL/TP backfill
-    max_hold_days: int = 4  # force-close positions held longer than this
+    max_hold_days: int = Field(
+        default_factory=lambda: int(os.getenv("COUNCIL_MAX_HOLD_DAYS", "1"))
+    )  # force-close positions held longer than this
     position_opened_utc: dict[str, str] = Field(default_factory=dict)  # coin_id → ISO ts first opened
 
     # Portfolio management — refreshed after each analysis cycle
@@ -182,7 +187,8 @@ class CryptoCouncilState(BaseModel):
 
 
 def _analyse_one_coin(
-    opportunity: CoinOpportunity, period: int, account_size: float, base_currency: str
+    opportunity: CoinOpportunity, period: int, account_size: float, base_currency: str,
+    max_hold_days: int = 1, atr_period: int = DEFAULT_ATR_PERIOD,
 ) -> tuple[CoinOpportunity, str | None, Exception | None, float]:
     """Run the analysis crew for one coin (worker thread).
 
@@ -198,8 +204,11 @@ def _analyse_one_coin(
                 "coin_id": opportunity.coin_id,
                 "vs_currency": DEFAULT_VS_CURRENCY,
                 "period": period,
+                "atr_period": atr_period,
                 "account_size": account_size,
                 "base_currency": base_currency,
+                "timeframe": "1h",
+                "max_hold_days": max_hold_days,
             }
         )
         return (opportunity, result.raw, None, time.perf_counter() - coin_start)
@@ -258,7 +267,12 @@ class CryptoCouncilFlow(Flow[CryptoCouncilState]):
         )
 
         try:
-            result = CouncilScoutCrew().crew().kickoff()
+            result = CouncilScoutCrew().crew().kickoff(
+                inputs={
+                    "max_hold_days": self.state.max_hold_days,
+                    "timeframe": "1h",
+                }
+            )
         except Exception as exc:
             self.state.last_scout_duration_s = time.perf_counter() - scout_start
             print(f"ERROR: Scout crew failed: {exc}. Keeping previous coin list.")
@@ -376,6 +390,8 @@ class CryptoCouncilFlow(Flow[CryptoCouncilState]):
                     self.state.period,
                     self.state.account_size,
                     self.state.base_currency,
+                    self.state.max_hold_days,
+                    self.state.atr_period,
                 )
                 for opportunity in to_analyse
             ]
@@ -536,6 +552,8 @@ class CryptoCouncilFlow(Flow[CryptoCouncilState]):
                     "base_currency": self.state.base_currency,
                     "max_total_exposure_pct": self.state.max_total_exposure_pct,
                     "max_single_position_pct": self.state.max_single_position_pct,
+                    "max_hold_days": self.state.max_hold_days,
+                    "timeframe": "1h",
                     "open_positions_json": json.dumps(open_positions),
                     "opportunities_json": json.dumps(opportunities_json),
                     "analysed_coins_json": json.dumps(analysed_coins_json),
@@ -649,6 +667,78 @@ class CryptoCouncilFlow(Flow[CryptoCouncilState]):
         # Reset analysed_coins for next cycle
         self.state.analysed_coins = []
 
+    def risk_tick(self) -> None:
+        """Deterministic fast risk check — NO LLM call.
+
+        Runs between analysis cycles to force-close positions whose
+        stop-loss/take-profit was hit or which exceeded max_hold_days,
+        using cached ATR snapshot prices. Writes a slim portfolio history
+        row so the panel reflects de-risking between LLM cycles.
+        """
+        if not self.state.portfolio_plan or not isinstance(
+            self.state.portfolio_plan.get("actions"), list
+        ):
+            return
+        # Refresh ages
+        now_utc = datetime.now(timezone.utc)
+        current_ids = {
+            str(a.get("coin_id"))
+            for a in self.state.portfolio_plan.get("actions", [])
+            if a.get("target", 0) > 0 and a.get("coin_id")
+        }
+        self.state.position_opened_utc = {
+            cid: iso for cid, iso in self.state.position_opened_utc.items() if cid in current_ids
+        }
+        # Latest prices from cache (no new network if fresh)
+        prices: dict[str, float] = {}
+        for cid in current_ids:
+            price, _atr = _atr_snapshot_for(cid)
+            if price is not None:
+                prices[cid] = price
+        if not prices:
+            return
+        plan = self.state.portfolio_plan
+        plan = _apply_sl_tp_hits(plan, prices)
+        plan = _apply_max_hold(
+            plan, self.state.position_opened_utc, self.state.max_hold_days, now_utc
+        )
+        self.state.portfolio_plan = _recompute_portfolio_totals(
+            plan, self.state.account_size
+        )
+        risk_snapshot = {
+            cid: {"current_price": p, "atr_pct": 0.0} for cid, p in prices.items()
+        }
+        pnl_summary = _update_paper_ledger(
+            self.state.portfolio_plan,
+            risk_snapshot,
+            self.state.account_size,
+            self.state.base_currency,
+            now_utc.isoformat(),
+            self.state.portfolio_cycle,
+        )
+        OUTPUT_DIR.mkdir(exist_ok=True)
+        with (OUTPUT_DIR / "portfolio_history.jsonl").open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps({
+                "ts": now_utc.isoformat(),
+                "cycle": self.state.portfolio_cycle,
+                "duration_s": 0.0,
+                "account_size": self.state.account_size,
+                "base_currency": self.state.base_currency,
+                "total_target": self.state.portfolio_plan.get("total_target", 0.0),
+                "total_exposure_pct": self.state.portfolio_plan.get("total_exposure_pct", 0.0),
+                "cash_remaining": self.state.portfolio_plan.get("cash_remaining", 0.0),
+                "n_positions": sum(
+                    1 for a in self.state.portfolio_plan.get("actions", [])
+                    if a.get("target", 0) > 0
+                ),
+                "total_pnl": pnl_summary.get("total_pnl", 0.0),
+                "realized_pnl": pnl_summary.get("realized_pnl", 0.0),
+                "unrealized_pnl": pnl_summary.get("unrealized_pnl", 0.0),
+                "equity": pnl_summary.get("equity", 0.0),
+                "source": "risk_tick",
+            }, ensure_ascii=False) + "\n")
+        _regenerate_portfolio_panel()
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -702,8 +792,8 @@ def _risk_levels_for(
     return (stop, take)
 
 
-_ATR_SNAPSHOT_DAYS = 30  # same key the analysis ATR tool fetches -> cache hit
-_ATR_SNAPSHOT_PERIOD = 14  # Wilder smoothing period, mirrors ATRTool
+_ATR_SNAPSHOT_DAYS = 3  # same key the analysis ATR tool fetches -> cache hit; ~3d of hourly candles
+_ATR_SNAPSHOT_PERIOD: int = int(os.getenv("COUNCIL_ATR_PERIOD", "14"))  # Wilder smoothing period, mirrors ATRTool
 
 
 def _update_paper_ledger(
@@ -883,6 +973,47 @@ def _atr_snapshot_for(coin_id: str) -> tuple[float | None, float | None]:
         return (round(price, 6), round(atr / price * 100, 4))
     except (TypeError, ValueError, IndexError):
         return (None, None)
+
+
+def _apply_sl_tp_hits(
+    plan: dict[str, Any],
+    prices: dict[str, float],
+) -> dict[str, Any]:
+    """Force ``close`` on positions whose stop/take was hit.
+
+    Deterministic, no LLM: for every open/increase action with a numeric
+    stop_loss or take_profit, if the latest cached price is at or beyond
+    the level, mark the action ``close`` (target 0). Notes are appended.
+    """
+    if not isinstance(plan, dict):
+        return plan
+    actions = plan.get("actions", [])
+    if not isinstance(actions, list):
+        return plan
+    for a in actions:
+        if not isinstance(a, dict) or a.get("action") == "close":
+            continue
+        target = a.get("target", 0) or 0
+        if target <= 0:
+            continue
+        price = prices.get(str(a.get("coin_id", "")))
+        if not price or price <= 0:
+            continue
+        stop = a.get("stop_loss")
+        take = a.get("take_profit")
+        hit = None
+        if isinstance(stop, (int, float)) and price <= float(stop):
+            hit = "stop_loss"
+        elif isinstance(take, (int, float)) and price >= float(take):
+            hit = "take_profit"
+        if hit:
+            a["action"] = "close"
+            a["target"] = 0
+            a["current"] = target
+            a["notes"] = (a.get("notes", "") + f" [{hit} hit @ {price}]").strip()
+            a["stop_loss"] = None
+            a["take_profit"] = None
+    return plan
 
 
 def _apply_max_hold(
@@ -1142,7 +1273,8 @@ def _parse_inputs(argv: list[str]) -> dict[str, Any]:
     Accepted flags:
       --account-size <float>   account size (default: 10000)
       --base-currency <str>    currency label (default: usd, e.g. toman, eur)
-      --period <int>           RSI period (default: 14)
+      --rsi-period <int>       RSI look-back in candles (default: 14)
+      --atr-period <int>       ATR look-back in candles (default: 14)
       --max-total-exposure <float>  max total invested % (default: 60)
       --max-single-position <float> max single-coin % (default: 20)
       --once                   run one full cycle and exit
@@ -1151,9 +1283,10 @@ def _parse_inputs(argv: list[str]) -> dict[str, Any]:
         "account_size": 10_000.0,
         "base_currency": "usd",
         "period": DEFAULT_RSI_PERIOD,
+        "atr_period": DEFAULT_ATR_PERIOD,
         "max_total_exposure_pct": 30.0,
         "max_single_position_pct": 5.0,
-        "max_hold_days": 4,
+        "max_hold_days": int(os.getenv("COUNCIL_MAX_HOLD_DAYS", "1")),
     }
     i = 1
     while i < len(argv):
@@ -1167,12 +1300,19 @@ def _parse_inputs(argv: list[str]) -> dict[str, Any]:
         elif arg in ("--base-currency", "--base_currency") and i + 1 < len(argv):
             inputs["base_currency"] = argv[i + 1].lower().strip()
             i += 2
-        elif arg in ("--period",) and i + 1 < len(argv):
+        elif arg in ("--rsi-period", "--period") and i + 1 < len(argv):
             try:
                 inputs["period"] = int(argv[i + 1])
             except ValueError:
                 pass
             i += 2
+        elif arg in ("--atr-period",) and i + 1 < len(argv):
+            try:
+                inputs["atr_period"] = int(argv[i + 1])
+            except ValueError:
+                pass
+            i += 2
+
         elif arg == "--once":
             inputs["_once"] = True
             i += 1
@@ -1206,10 +1346,11 @@ def _parse_inputs(argv: list[str]) -> dict[str, Any]:
 async def _run_async(
     account_size: float,
     period: int,
+    atr_period: int = DEFAULT_ATR_PERIOD,
     run_once: bool = False,
     max_total_exposure_pct: float = 30.0,
     max_single_position_pct: float = 5.0,
-    max_hold_days: int = 4,
+    max_hold_days: int = 1,
     base_currency: str = "usd",
 ) -> None:
     """
@@ -1230,12 +1371,14 @@ async def _run_async(
     flow.state.account_size = account_size
     flow.state.base_currency = base_currency
     flow.state.period = period
+    flow.state.atr_period = atr_period
     flow.state.max_total_exposure_pct = max_total_exposure_pct
     flow.state.max_single_position_pct = max_single_position_pct
     flow.state.max_hold_days = max_hold_days
 
     last_scout_time: float = 0.0        # force scout on first iteration
     last_analysis_time: float = 0.0     # force analysis on first iteration
+    last_risk_tick_time: float = 0.0    # force risk tick on first iteration
     run_started = time.perf_counter()
 
     # Cycle locking: ensure no overlapping cycles
@@ -1258,6 +1401,14 @@ async def _run_async(
                     except Exception as exc:
                         print(f"ERROR: Scout cycle failed: {exc}. Continuing.")
                     last_scout_time = time.time()
+
+        # --- Risk tick (every 60 s, deterministic, no LLM) ---
+        if (now - last_risk_tick_time >= RISK_TICK_INTERVAL_SECONDS):
+            try:
+                await asyncio.to_thread(flow.risk_tick)
+            except Exception as exc:
+                print(f"ERROR: Risk tick failed: {exc}. Continuing.")
+            last_risk_tick_time = time.time()
 
         # --- Analysis (every 5 minutes) ---
         if (now - last_analysis_time >= ANALYSIS_INTERVAL_SECONDS):
@@ -1312,10 +1463,11 @@ def kickoff() -> None:
             account_size=inputs.get("account_size", 10_000.0),
             base_currency=inputs.get("base_currency", "usd"),
             period=inputs.get("period", DEFAULT_RSI_PERIOD),
+            atr_period=inputs.get("atr_period", DEFAULT_ATR_PERIOD),
             run_once=run_once,
             max_total_exposure_pct=inputs.get("max_total_exposure_pct", 30.0),
             max_single_position_pct=inputs.get("max_single_position_pct", 5.0),
-            max_hold_days=inputs.get("max_hold_days", 4),
+            max_hold_days=inputs.get("max_hold_days", int(os.getenv("COUNCIL_MAX_HOLD_DAYS", "1"))),
         )
     )
 

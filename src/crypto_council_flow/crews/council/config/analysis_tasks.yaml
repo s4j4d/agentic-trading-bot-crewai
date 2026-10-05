@@ -3,10 +3,15 @@ technical_analysis_task:
     Perform a focused technical analysis of {symbol} (CoinGecko ID: {coin_id})
     priced in {vs_currency}.
 
+    You are trading on the HOURLY timeframe: every indicator (RSI, MACD, ATR)
+    must be read from 1-hour candles, not daily ones. Your analysis feeds a
+    paper portfolio whose maximum holding period is {max_hold_days} day(s), so
+    favor signals that resolve within hours, not multi-day trend continuation.
+
     Use your tools in this order:
     1. RSI ({period}-period) to assess momentum and overbought/oversold levels.
     2. MACD (12/26/9) to identify momentum crossovers.
-    3. ATR (14-period) to quantify recent volatility and compute stop distances.
+    3. ATR ({atr_period}-period) to quantify recent volatility and compute stop distances.
 
     Synthesise the three indicators into a structured report covering:
     - Primary trend (bullish / bearish / sideways)
@@ -27,7 +32,7 @@ technical_analysis_task:
     **Trend:** [bullish|bearish|sideways]
     **Momentum (RSI {period}):** [value] — [overbought|oversold|neutral]
     **MACD Signal:** [crossover_signal]
-    **ATR (14):** [atr] ([atr_pct]%) — [volatility_level]
+    **ATR ({atr_period}):** [atr] ([atr_pct]%) — [volatility_level]
     **Key Support:** [value]
     **Key Resistance:** [value]
     **Bias:** [bullish|bearish|neutral] (confidence: [high|medium|low])
@@ -41,6 +46,10 @@ sentiment_analysis_task:
   description: >
     Conduct a focused sentiment sweep for {symbol} (CoinGecko ID: {coin_id}) to
     determine whether market psychology currently supports or undermines a trade.
+
+    You are evaluating a trade with at most {max_hold_days} day(s) holding period,
+    entered and exited on 1-hour candle signals. Weight catalysts and narratives
+    that move price within hours over slow multi-week macro shifts.
 
     Execute the following in order:
     1. Fear & Greed Index (7-day history) — identify the current reading and trend.
@@ -83,6 +92,7 @@ risk_assessment_task:
         - Entry price: use the entry zone midpoint from the technical analysis
         - Stop-loss: use the invalidation level from the technical analysis
         - Reward/risk ratio target: 2:1 minimum
+        - Horizon: intraday, at most {max_hold_days} day(s), sized for 1-hour candles
 
     Execute the following risk tools:
     1. Position Sizing — compute Kelly and fixed-risk position sizes using a

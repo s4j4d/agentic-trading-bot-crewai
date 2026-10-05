@@ -4,6 +4,10 @@ portfolio_management_task:
 
     Account size: {account_size} {base_currency} | Max total exposure:
     {max_total_exposure_pct}% | Max single position: {max_single_position_pct}%.
+    Maximum holding period: {max_hold_days} day(s). Signals are computed from
+    1-hour candles; judge keep/trim/close on hourly momentum and hour-over-hour
+    volatility, not daily trends. Prefer positions that can resolve within the
+    same day.
 
     Current open paper positions (JSON array of {"coin_id", "position"}):
     {open_positions_json}

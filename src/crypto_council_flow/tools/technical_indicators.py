@@ -36,7 +36,7 @@ _USE_EXCHANGE = os.getenv("USE_EXCHANGE_OHLC", "false").lower() == "true"
 # In-memory OHLC cache: one fetch per (coin, vs, days) shared by all
 # indicator tools. Without this, a single coin analysis fires 5-7 identical
 # CoinGecko requests back-to-back and trips the free-tier rate limit (429).
-_OHLC_TTL_S = 15 * 60  # OHLC history barely moves within a cycle
+_OHLC_TTL_S = float(os.getenv("COUNCIL_OHLC_TTL_S", "300"))  # 5 min; hourly candles update within a cycle
 _ohlc_cache: dict[tuple[str, str, int, bool], tuple[float, list[list[float]]]] = {}
 _ohlc_lock = threading.Lock()
 _last_coingecko_call: float = 0.0
@@ -110,8 +110,8 @@ def _fetch_ohlcv_exchange(coin_id: str, vs_currency: str, days: int) -> list[lis
     to_ts = int(time.time())
     from_ts = to_ts - days * 86400
 
-    # Use daily timeframe for indicator calculations
-    candles = client.get_ohlc(symbol, "1d", from_ts, to_ts)
+    # Use hourly timeframe for indicator calculations (intraday trading)
+    candles = client.get_ohlc(symbol, "1h", from_ts, to_ts)
 
     # Ensure minimum candles
     if len(candles) < _MIN_CANDLES and days < 730:
@@ -233,8 +233,8 @@ class RSIInput(BaseModel):
         ),
     )
     vs_currency: str = Field(default="usd", description="Quote currency (e.g. 'usd', 'btc').")
-    days: int = Field(default=90, ge=30, le=730, description="Number of days of OHLC history to fetch.")
-    period: int = Field(default=14, ge=2, le=50, description="RSI look-back period.")
+    days: int = Field(default=3, ge=1, le=14, description="Number of days of hourly OHLC history to fetch.")
+    period: int = Field(default=int(os.getenv("COUNCIL_RSI_PERIOD", "14")), ge=2, le=50, description="RSI look-back period.")
 
 
 class RSITool(BaseTool):
@@ -247,7 +247,8 @@ class RSITool(BaseTool):
     )
     args_schema: Type[BaseModel] = RSIInput
 
-    def _run(self, coin_id: str, vs_currency: str = "usd", days: int = 90, period: int = 14) -> str:
+    def _run(self, coin_id: str, vs_currency: str = "usd", days: int = 3, period: int = 14) -> str:
+        period = int(os.getenv("COUNCIL_RSI_PERIOD", str(period)))
         try:
             ohlcv = _fetch_ohlcv(coin_id, vs_currency, days)
             if len(ohlcv) < period + 1:
@@ -293,7 +294,7 @@ class RSITool(BaseTool):
 class MACDInput(BaseModel):
     coin_id: str = Field(..., description="CoinGecko coin ID (e.g. 'bitcoin').")
     vs_currency: str = Field(default="usd", description="Quote currency.")
-    days: int = Field(default=60, ge=30, le=365, description="Days of history.")
+    days: int = Field(default=3, ge=1, le=14, description="Days of hourly history.")
     fast_period: int = Field(default=12, ge=2, le=50, description="Fast EMA period.")
     slow_period: int = Field(default=26, ge=5, le=100, description="Slow EMA period.")
     signal_period: int = Field(default=9, ge=2, le=30, description="Signal line EMA period.")
@@ -321,7 +322,7 @@ class MACDTool(BaseTool):
         self,
         coin_id: str,
         vs_currency: str = "usd",
-        days: int = 60,
+        days: int = 3,
         fast_period: int = 12,
         slow_period: int = 26,
         signal_period: int = 9,
@@ -376,7 +377,7 @@ class MACDTool(BaseTool):
 class BollingerBandsInput(BaseModel):
     coin_id: str = Field(..., description="CoinGecko coin ID (e.g. 'bitcoin').")
     vs_currency: str = Field(default="usd", description="Quote currency.")
-    days: int = Field(default=30, ge=7, le=365, description="Days of history.")
+    days: int = Field(default=3, ge=1, le=14, description="Days of hourly history.")
     period: int = Field(default=20, ge=5, le=100, description="SMA look-back period.")
     num_std: float = Field(default=2.0, ge=0.5, le=4.0, description="Number of standard deviations for bands.")
 
@@ -395,7 +396,7 @@ class BollingerBandsTool(BaseTool):
         self,
         coin_id: str,
         vs_currency: str = "usd",
-        days: int = 30,
+        days: int = 3,
         period: int = 20,
         num_std: float = 2.0,
     ) -> str:
@@ -453,7 +454,7 @@ class BollingerBandsTool(BaseTool):
 class EMACrossInput(BaseModel):
     coin_id: str = Field(..., description="CoinGecko coin ID (e.g. 'bitcoin').")
     vs_currency: str = Field(default="usd", description="Quote currency.")
-    days: int = Field(default=90, ge=30, le=365, description="Days of history.")
+    days: int = Field(default=3, ge=1, le=14, description="Days of hourly history.")
     fast_period: int = Field(default=9, ge=2, le=50, description="Fast EMA period.")
     slow_period: int = Field(default=21, ge=5, le=200, description="Slow EMA period.")
 
@@ -481,7 +482,7 @@ class EMACrossTool(BaseTool):
         self,
         coin_id: str,
         vs_currency: str = "usd",
-        days: int = 90,
+        days: int = 3,
         fast_period: int = 9,
         slow_period: int = 21,
     ) -> str:
@@ -539,8 +540,8 @@ class EMACrossTool(BaseTool):
 class ATRInput(BaseModel):
     coin_id: str = Field(..., description="CoinGecko coin ID (e.g. 'bitcoin').")
     vs_currency: str = Field(default="usd", description="Quote currency.")
-    days: int = Field(default=30, ge=7, le=365, description="Days of history.")
-    period: int = Field(default=14, ge=2, le=50, description="ATR look-back period.")
+    days: int = Field(default=3, ge=1, le=14, description="Days of hourly history.")
+    period: int = Field(default=int(os.getenv("COUNCIL_ATR_PERIOD", "14")), ge=2, le=50, description="ATR look-back period.")
 
 
 class ATRTool(BaseTool):
@@ -553,7 +554,8 @@ class ATRTool(BaseTool):
     )
     args_schema: Type[BaseModel] = ATRInput
 
-    def _run(self, coin_id: str, vs_currency: str = "usd", days: int = 30, period: int = 14) -> str:
+    def _run(self, coin_id: str, vs_currency: str = "usd", days: int = 3, period: int = 14) -> str:
+        period = int(os.getenv("COUNCIL_ATR_PERIOD", str(period)))
         try:
             ohlcv = _fetch_ohlcv(coin_id, vs_currency, days)
             if len(ohlcv) < period + 1:
