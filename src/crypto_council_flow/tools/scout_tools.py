@@ -8,6 +8,8 @@ import requests
 from crewai.tools import BaseTool
 from pydantic import BaseModel, Field
 
+from crypto_council_flow.tools.exchange_base import get_exchange_client
+
 
 _DEFAULT_TIMEOUT = 10
 _COINGECKO_BASE = "https://api.coingecko.com/api/v3"
@@ -313,6 +315,15 @@ class VolatilityScreenerInput(BaseModel):
         description="Maximum CoinGecko market-cap rank.",
     )
 
+    require_exchange_listing: bool = Field(
+        default=True,
+        description=(
+            "Whether to keep only coins that are listed/active on the configured "
+            "exchange (EXCHANGE_QUOTE pair). If the exchange list cannot be "
+            "fetched, returns the unfiltered ranking rather than nothing."
+        ),
+    )
+
 
 class VolatilityScreenerTool(BaseTool):
     name: str = "volatility_screener"
@@ -329,12 +340,14 @@ class VolatilityScreenerTool(BaseTool):
         top_n: int = 20,
         min_volume_usd: float = 1_000_000,
         max_market_cap_rank: int = 500,
+        require_exchange_listing: bool = True,
     ) -> str:
 
         params = {
             "top_n": top_n,
             "min_volume_usd": min_volume_usd,
             "max_market_cap_rank": max_market_cap_rank,
+            "require_exchange_listing": require_exchange_listing,
         }
 
         cached = _cache_get(self.name, params)
@@ -567,6 +580,52 @@ class VolatilityScreenerTool(BaseTool):
                 })
 
             # -----------------------------------------------------------
+            # Exchange-listing filter
+            # -----------------------------------------------------------
+            # Keep only coins that are actually listed/active on the
+            # configured exchange (EXCHANGE_QUOTE pair). Otherwise the
+            # volatility ranking can surface coins we cannot trade, and
+            # the scout's shortlist would silently mix tradable and
+            # non-tradable names. If the exchange list is unavailable,
+            # fall back to the unfiltered ranking.
+            # -----------------------------------------------------------
+
+            exchange_filter_applied = False
+            exchange_filter_note = "disabled"
+
+            if require_exchange_listing:
+                try:
+                    client = get_exchange_client()
+                    markets = client.list_markets()
+                    quote = (os.getenv("EXCHANGE_QUOTE", "rls") or "rls").lower()
+                    listed_bases = {
+                        (m.get("base") or "").lower()
+                        for m in markets
+                        if m.get("active") and (m.get("quote") or "").lower() == quote
+                    }
+                    if listed_bases:
+                        before = len(candidates)
+                        candidates = [
+                            c for c in candidates
+                            if c["symbol"].lower() in listed_bases
+                        ]
+                        exchange_filter_applied = True
+                        exchange_filter_note = (
+                            f"kept {len(candidates)}/{before} coins listed on "
+                            f"{client.__class__.__name__} ({quote} pairs)"
+                        )
+                    else:
+                        exchange_filter_note = (
+                            f"exchange returned no active {quote} markets; "
+                            "ranking left unfiltered"
+                        )
+                except Exception as exc:
+                    exchange_filter_note = (
+                        f"exchange list unavailable ({type(exc).__name__}: {exc}); "
+                        "ranking left unfiltered"
+                    )
+
+            # -----------------------------------------------------------
             # Volatility score
             # -----------------------------------------------------------
             #
@@ -665,6 +724,10 @@ class VolatilityScreenerTool(BaseTool):
                 "criteria": {
                     "min_volume_usd": min_volume_usd,
                     "max_market_cap_rank": max_market_cap_rank,
+                },
+                "exchange_filter": {
+                    "applied": exchange_filter_applied,
+                    "note": exchange_filter_note,
                 },
                 "coins": candidates[:top_n],
             })

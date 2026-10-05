@@ -31,6 +31,15 @@ market_scout_task:
        whether a candidate is tradeable. Do NOT analyse the sample list.
        Confirm each finalist with exchange_ticker.
 
+       IMPORTANT: every candidate from EVERY other tool result
+       (trending_coins, momentum_screener, volatility_screener,
+       new_listings, upcoming_catalysts) must be cross-checked against
+       this exchange market list. A coin that is not listed/active on
+       the exchange's active quote pair is NOT tradable: drop it from
+       the candidate pool entirely, regardless of its
+       volatility/momentum/attention score. The final shortlist must
+       contain only coins whose symbol appears in exchange_markets.
+
     1. trending_coins (top_n=5)
        Identify coins receiving unusually high market attention.
        Use this as an attention signal, not as a volatility measurement.
