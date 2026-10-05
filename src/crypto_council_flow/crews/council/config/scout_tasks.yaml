@@ -12,6 +12,9 @@ market_scout_task:
     momentum_screener, volatility_screener, new_listings, exchange_markets)
     in a SINGLE response — they have no dependencies on each other and
     will be executed concurrently. Do not chain them one per turn.
+    Likewise, all per-symbol calls to the SAME tool (e.g. one
+    exchange_ohlc call per candidate) must go in ONE response so they run
+    concurrently — never one per turn.
     If a tool call errors or returns nothing usable, retry it once with
     default arguments before moving on.
     After collecting the results, analyze the existing observations.
@@ -81,21 +84,35 @@ market_scout_task:
 
     6. exchange_ohlc (symbol, timeframe="1d", days=30, top candidates only)
        This is a DIFFERENT tool with a DIFFERENT argument shape: exactly one
-       "symbol" string per call, never a list. Call it once per finalist
-       you want to check — e.g. {"symbol": "BTCUSDT", "timeframe": "1d",
-       "days": 30}. Do NOT combine it with exchange_batch_ticker in the
-       same call. Use the recent exchange candles to confirm tradable
-       volatility before final ranking. Note: the downstream analysis and
-       execution trade on 1-hour candles with a max hold of {max_hold_days}
-       day(s), so prefer coins with frequent significant hourly movements,
-       not just multi-day trends.
+       "symbol" string per call, never a list — e.g. {"symbol": "BTCUSDT",
+       "timeframe": "1d", "days": 30}. Do NOT combine it with
+       exchange_batch_ticker in the same call.
+
+       CONCURRENT: emit ONE exchange_ohlc call per finalist you want to
+       check, ALL IN THE SAME RESPONSE, so they execute concurrently. Do
+       NOT issue them one turn at a time. For example, if your finalists
+       are BTCUSDT, ETHUSDT and SOLUSDT, your next response contains three
+       separate exchange_ohlc tool calls — one per symbol — not one call
+       with three symbols and not three sequential calls.
+
+       Use the recent exchange candles to confirm tradable volatility
+       before final ranking. Note: the downstream analysis and execution
+       trade on 1-hour candles with a max hold of {max_hold_days} day(s),
+       so prefer coins with frequent significant hourly movements, not
+       just multi-day trends.
 
     Ordering / concurrency:
-    Steps 1-5 have no dependencies on each other and SHOULD be emitted
-    together in a SINGLE response. Steps 0 and 5 come first (markets, then
-    batch ticker). Step 6 DEPENDS on step 5's results, so it must be issued
-    in a LATER response, after the batch-ticker results have arrived —
-    never in the same batch as step 5.
+    Phase A (steps 1-5): trending_coins, momentum_screener,
+    volatility_screener, new_listings, exchange_markets and
+    exchange_batch_ticker have no dependencies on each other — emit them
+    together in a SINGLE response.
+
+    Phase B (step 6): every exchange_ohlc call depends on the
+    exchange_batch_ticker results (you need to know which symbols are
+    listed and liquid first). So issue them in a LATER response — never in
+    the same batch as step 5. Within Phase B, issue ALL per-symbol
+    exchange_ohlc calls together in that one response so they run
+    concurrently.
 
     Evaluate candidates using:
 
