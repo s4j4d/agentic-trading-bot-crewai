@@ -439,6 +439,7 @@ class PortfolioAction(BaseModel):
     reason: str = ""
     stop_loss: float | None = None
     take_profit: float | None = None
+    sl_tp_source: str = "computed"  # "explicit" (crew numbers kept) | "computed" (ATR values used) | "none"
 
     model_config = {"extra": "ignore"}
 

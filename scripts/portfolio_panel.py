@@ -190,6 +190,7 @@ def build() -> str:
             f"<td class='num'>{(tgt / account * 100 if account else 0):.1f}%</td>"
             f"<td class='num'>{_lvl(a.get('stop_loss'))}</td>"
             f"<td class='num'>{_lvl(a.get('take_profit'))}</td>"
+            f"<td>{_esc(a.get('sl_tp_source', '—'))}</td>"
             f"<td class='num'>{_esc(score_by_coin.get(a.get('coin_id', ''), '—'))}</td>"
             f"<td class='reason'>{_esc(a.get('reason', ''))}</td>"
             "</tr>"
@@ -197,12 +198,12 @@ def build() -> str:
     positions = (
         "<div class='card'><h2>Positions — cycle #%s</h2>" % _esc(cycle)
         + "<table><thead><tr><th>Coin</th><th>Action</th><th>Current</th>"
-        "<th>Target</th><th>Delta</th><th>Acct %</th><th>Stop</th><th>Take</th><th>Score</th><th>Why</th>"
+        "<th>Target</th><th>Delta</th><th>Acct %</th><th>Stop</th><th>Take</th><th>SL/TP src</th><th>Score</th><th>Why</th>"
         "</tr></thead><tbody>"
-        + ("".join(rows) if rows else "<tr><td colspan=10>No actions in plan.</td></tr>")
+        + ("".join(rows) if rows else "<tr><td colspan=11>No actions in plan.</td></tr>")
         + "</tbody></table>"
         + f"<p class='muted'>Amounts in {cur}. Delta = rebalance flow (target − current), not profit. "
-        "Stop/Take = 1x-ATR stop-loss and 2:1 take-profit price levels (vs currency), informational — no orders are placed.</p></div>"
+        "Stop/Take = 0.5x-ATR stop-loss and 1x-ATR take-profit price levels (vs currency), informational — no orders are placed. SL/TP src: explicit = crew numbers within 20% kept, computed = deterministic ATR values used, none = unavailable.</p></div>"
     )
 
     # --- P&L honesty box ---
