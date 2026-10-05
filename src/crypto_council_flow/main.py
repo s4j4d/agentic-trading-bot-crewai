@@ -70,6 +70,8 @@ DEFAULT_BASE_CURRENCY: str = "usd"
 DEFAULT_RSI_PERIOD: int = 14
 OUTPUT_DIR: Path = Path("output")
 CONSOLIDATED_RESULTS: Path = OUTPUT_DIR / "all_analysis_results.txt"
+LEDGER_PATH: Path = OUTPUT_DIR / "paper_ledger.json"
+POSITIONS_PATH: Path = OUTPUT_DIR / "paper_positions.json"
 
 
 # ---------------------------------------------------------------------------
@@ -573,6 +575,16 @@ class CryptoCouncilFlow(Flow[CryptoCouncilState]):
             self.state.last_portfolio_utc = datetime.now(timezone.utc).isoformat()
             self.state.last_portfolio_duration_s = time.perf_counter() - portfolio_start
 
+            # Paper-trade the plan at current prices so P&L is trackable.
+            pnl_summary = _update_paper_ledger(
+                self.state.portfolio_plan,
+                risk_snapshot,
+                self.state.account_size,
+                self.state.base_currency,
+                self.state.last_portfolio_utc,
+                self.state.portfolio_cycle,
+            )
+
             OUTPUT_DIR.mkdir(exist_ok=True)
             snapshot = {
                 "saved_utc": self.state.last_portfolio_utc,
@@ -585,6 +597,7 @@ class CryptoCouncilFlow(Flow[CryptoCouncilState]):
                 "plan": self.state.portfolio_plan,
                 "opportunities": opportunities_json,
                 "analysed_coins": analysed_coins_json,
+                "pnl": pnl_summary,
             }
             (OUTPUT_DIR / "portfolio_plan.json").write_text(
                 json.dumps(snapshot, ensure_ascii=False, indent=2), encoding="utf-8"
@@ -603,7 +616,13 @@ class CryptoCouncilFlow(Flow[CryptoCouncilState]):
                         1 for a in self.state.portfolio_plan.get("actions", [])
                         if a.get("target", 0) > 0
                     ),
+                    "total_pnl": pnl_summary.get("total_pnl", 0.0),
+                    "realized_pnl": pnl_summary.get("realized_pnl", 0.0),
+                    "unrealized_pnl": pnl_summary.get("unrealized_pnl", 0.0),
+                    "equity": pnl_summary.get("equity", 0.0),
                 }, ensure_ascii=False) + "\n")
+
+            _regenerate_portfolio_panel()
 
             total_target = self.state.portfolio_plan.get("total_target", 0.0)
             total_pct = self.state.portfolio_plan.get("total_exposure_pct", 0.0)
@@ -685,6 +704,149 @@ def _risk_levels_for(
 
 _ATR_SNAPSHOT_DAYS = 30  # same key the analysis ATR tool fetches -> cache hit
 _ATR_SNAPSHOT_PERIOD = 14  # Wilder smoothing period, mirrors ATRTool
+
+
+def _update_paper_ledger(
+    plan: dict[str, Any],
+    risk_snapshot: dict[str, dict[str, float]],
+    account_size: float,
+    base_currency: str,
+    now_iso: str,
+    cycle: int,
+) -> dict[str, Any]:
+    """Fill the plan against the paper ledger using current prices.
+
+    Prices come from the risk snapshot (cached OHLC close) — zero new
+    network calls. Positions are tracked as {coin_id: {qty, avg_cost}} in
+    paper_positions.json; trades append to paper_ledger.json. Returns a
+    P&L summary dict for the snapshot/panel.
+    """
+    positions: dict[str, dict[str, float]] = {}
+    if POSITIONS_PATH.exists():
+        try:
+            positions = json.loads(POSITIONS_PATH.read_text(encoding="utf-8"))
+        except Exception:
+            positions = {}
+    ledger: list[dict[str, Any]] = []
+    if LEDGER_PATH.exists():
+        try:
+            ledger = json.loads(LEDGER_PATH.read_text(encoding="utf-8"))
+        except Exception:
+            ledger = []
+
+    realized = 0.0
+    trades: list[dict[str, Any]] = []
+    # Close positions no longer in the plan at current price.
+    plan_targets = {
+        a.get("coin_id"): float(a.get("target", 0) or 0)
+        for a in plan.get("actions", [])
+    }
+    for coin_id in list(positions.keys()):
+        target = plan_targets.get(coin_id, 0.0)
+        if target <= 0:
+            pos = positions.pop(coin_id)
+            px = (risk_snapshot.get(coin_id) or {}).get("current_price")
+            if px and pos.get("qty"):
+                proceeds = pos["qty"] * px
+                cost = pos["qty"] * pos["avg_cost"]
+                realized += proceeds - cost
+                trades.append({
+                    "ts": now_iso, "cycle": cycle, "coin_id": coin_id,
+                    "side": "close", "qty": pos["qty"], "price": px,
+                    "amount": proceeds, "realized_pnl": proceeds - cost,
+                })
+            else:
+                trades.append({
+                    "ts": now_iso, "cycle": cycle, "coin_id": coin_id,
+                    "side": "close", "qty": pos.get("qty", 0),
+                    "price": px, "amount": 0.0, "realized_pnl": None,
+                    "note": "no price available — position dropped without P&L",
+                })
+
+    # Apply plan deltas at current price.
+    for a in plan.get("actions", []):
+        coin_id = a.get("coin_id")
+        if not coin_id:
+            continue
+        target = float(a.get("target", 0) or 0)
+        px = (risk_snapshot.get(coin_id) or {}).get("current_price")
+        if not px:
+            continue
+        qty_target = target / px
+        pos = positions.setdefault(coin_id, {"qty": 0.0, "avg_cost": 0.0})
+        qty_now = pos["qty"]
+        delta_qty = qty_target - qty_now
+        if abs(delta_qty) * px < 1e-9:
+            continue
+        side = "buy" if delta_qty > 0 else "sell"
+        amount = delta_qty * px
+        trade = {
+            "ts": now_iso, "cycle": cycle, "coin_id": coin_id,
+            "side": side, "qty": delta_qty, "price": px, "amount": amount,
+        }
+        if side == "buy":
+            new_qty = qty_now + delta_qty
+            pos["avg_cost"] = (
+                (qty_now * pos["avg_cost"] + delta_qty * px) / new_qty
+                if new_qty else 0.0
+            )
+            pos["qty"] = new_qty
+        else:
+            trade["realized_pnl"] = delta_qty * (px - pos["avg_cost"])
+            realized += trade["realized_pnl"]
+            pos["qty"] = qty_now + delta_qty
+            if pos["qty"] <= 1e-9:
+                positions.pop(coin_id, None)
+        trades.append(trade)
+
+    # Unrealized P&L on remaining positions.
+    unrealized = 0.0
+    open_positions: list[dict[str, Any]] = []
+    for coin_id, pos in positions.items():
+        px = (risk_snapshot.get(coin_id) or {}).get("current_price")
+        if not px or not pos.get("qty"):
+            continue
+        market = pos["qty"] * px
+        cost = pos["qty"] * pos["avg_cost"]
+        upl = market - cost
+        unrealized += upl
+        open_positions.append({
+            "coin_id": coin_id, "qty": pos["qty"], "avg_cost": pos["avg_cost"],
+            "price": px, "market_value": market, "unrealized_pnl": upl,
+        })
+
+    ledger.extend(trades)
+    LEDGER_PATH.write_text(json.dumps(ledger, ensure_ascii=False, indent=2), encoding="utf-8")
+    POSITIONS_PATH.write_text(json.dumps(positions, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    total_realized = sum(
+        t.get("realized_pnl") or 0.0 for t in ledger if t.get("realized_pnl") is not None
+    )
+    invested = sum(p["market_value"] for p in open_positions)
+    equity = account_size - invested + total_realized + unrealized
+    return {
+        "realized_pnl": total_realized,
+        "unrealized_pnl": unrealized,
+        "total_pnl": total_realized + unrealized,
+        "equity": equity,
+        "invested": invested,
+        "open_positions": open_positions,
+        "n_trades": len(ledger),
+    }
+
+
+def _regenerate_portfolio_panel() -> None:
+    """Run the stdlib panel script after each portfolio cycle. Best-effort."""
+    try:
+        import subprocess, sys
+        script = Path(__file__).resolve().parent.parent.parent / "scripts" / "portfolio_panel.py"
+        subprocess.run(
+            [sys.executable, str(script)],
+            cwd=Path(__file__).resolve().parent.parent.parent,
+            check=False, capture_output=True, timeout=30,
+        )
+    except Exception:
+        pass
 
 
 def _atr_snapshot_for(coin_id: str) -> tuple[float | None, float | None]:

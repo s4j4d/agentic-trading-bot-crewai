@@ -9,10 +9,9 @@ Regenerate after each run:
 
 Stdlib only. Single self-contained HTML file, auto-refreshes every 60s.
 
-Honest limitation: this bot produces paper allocation plans (current -> target
-amounts per coin). It does NOT track entry prices or fills, so per-coin
-realized P&L cannot be computed — the panel shows allocation state and
-cycle-over-cycle changes, and says so where P&L would go.
+P&L is computed from a paper ledger (output/paper_ledger.json +
+output/paper_positions.json) that manage_portfolio() fills each cycle at the
+run's current prices — see _update_paper_ledger() in main.py.
 """
 
 from __future__ import annotations
@@ -206,15 +205,47 @@ def build() -> str:
         "Stop/Take = 0.5x-ATR stop-loss and 1x-ATR take-profit price levels (vs currency), informational — no orders are placed. SL/TP src: explicit = crew numbers within 20% kept, computed = deterministic ATR values used, none = unavailable.</p></div>"
     )
 
-    # --- P&L honesty box ---
-    pnl = (
-        "<div class='card warn'><h2>Profit / loss</h2>"
-        "<p>Not tracked. This bot writes paper allocation plans "
-        "(current → target amounts) — it records no entry prices or fills, "
-        "so per-coin and total P&amp;L cannot be computed from plan data. "
-        "What <i>is</i> meaningful here: cycle-over-cycle drift in Total invested "
-        "below, and per-coin Delta flow in the table above.</p></div>"
-    )
+    # --- P&L from the paper ledger (filled at current price each cycle) ---
+    pnl_data = snap.get("pnl") or {}
+    if pnl_data:
+        total_pnl = float(pnl_data.get("total_pnl", 0) or 0)
+        realized = float(pnl_data.get("realized_pnl", 0) or 0)
+        unrealized = float(pnl_data.get("unrealized_pnl", 0) or 0)
+        equity = float(pnl_data.get("equity", 0) or 0)
+        invested = float(pnl_data.get("invested", 0) or 0)
+        n_trades = pnl_data.get("n_trades", 0)
+        t_cls = "pos" if total_pnl > 0 else ("neg" if total_pnl < 0 else "")
+        open_pos = pnl_data.get("open_positions") or []
+        pos_rows = "".join(
+            "<tr><td>%s</td><td class='num'>%.6g</td><td class='num'>%.4g</td>"
+            "<td class='num'>%.4g</td><td class='num'>%.2f</td>"
+            "<td class='num %s'>%+.2f</td></tr>" % (
+                _esc(p.get("coin_id", "?")), float(p.get("qty", 0) or 0),
+                float(p.get("avg_cost", 0) or 0), float(p.get("price", 0) or 0),
+                float(p.get("market_value", 0) or 0),
+                "pos" if (p.get("unrealized_pnl") or 0) > 0 else ("neg" if (p.get("unrealized_pnl") or 0) < 0 else ""),
+                float(p.get("unrealized_pnl", 0) or 0),
+            ) for p in open_pos
+        ) or "<tr><td colspan=6>No open paper positions.</td></tr>"
+        pnl = (
+            "<div class='card'><h2>Profit / loss (paper ledger)</h2>"
+            "<div class='kpis'>"
+            f"<div class='card kpi'><span>Total P&amp;L</span><b class='{t_cls}'>{total_pnl:+,.2f} {cur}</b></div>"
+            f"<div class='card kpi'><span>Realized</span><b>{realized:+,.2f} {cur}</b></div>"
+            f"<div class='card kpi'><span>Unrealized</span><b>{unrealized:+,.2f} {cur}</b></div>"
+            f"<div class='card kpi'><span>Equity</span><b>{equity:,.2f} {cur}</b></div>"
+            f"<div class='card kpi'><span>Invested</span><b>{invested:,.2f} {cur}</b></div>"
+            f"<div class='card kpi'><span>Trades logged</span><b>{n_trades}</b></div>"
+            "</div>"
+            "<table><thead><tr><th>Coin</th><th>Qty</th><th>Avg cost</th><th>Last</th><th>Value</th><th>UPL</th></tr></thead><tbody>"
+            + pos_rows + "</tbody></table>"
+            "<p class='muted'>Filled at the run's current prices (same snapshot used for SL/TP). Realized P&amp;L accrues on sells/closes; unrealized marks open positions to the latest run price.</p></div>"
+        )
+    else:
+        pnl = (
+            "<div class='card warn'><h2>Profit / loss</h2>"
+            "<p>No ledger data yet — P&amp;L is computed after the first portfolio cycle fills the paper ledger (output/paper_ledger.json).</p></div>"
+        )
 
     # --- history ---
     hist_block = "<div class='card'><h2>Cycle history</h2>"
@@ -223,13 +254,13 @@ def build() -> str:
             "<p class='muted'>Total invested (%s) per portfolio cycle</p>" % cur
             + _sparkline([float(h.get("total_target", 0) or 0) for h in hist])
             + "<table><thead><tr><th>Cycle</th><th>Time (UTC)</th><th>Invested</th>"
-            "<th>Exposure</th><th>Cash</th><th>Positions</th><th>Took</th></tr></thead><tbody>"
+            "<th>Exposure</th><th>Cash</th><th>Positions</th><th>Took</th><th>Total P&L</th></tr></thead><tbody>"
         )
         for h in reversed(hist[-12:]):
             hist_block += (
                 "<tr><td>#%s</td><td><small>%s</small></td><td class='num'>%s</td>"
                 "<td class='num'>%.1f%%</td><td class='num'>%s</td><td class='num'>%s</td>"
-                "<td class='num'>%s</td></tr>"
+                "<td class='num'>%s</td><td class='num %s'>%s</td></tr>"
                 % (
                     _esc(h.get("cycle", "?")), _esc(str(h.get("ts", ""))[:16]),
                     f"{float(h.get('total_target', 0) or 0):,.0f}",
@@ -237,6 +268,8 @@ def build() -> str:
                     f"{float(h.get('cash_remaining', 0) or 0):,.0f}",
                     _esc(h.get("n_positions", "?")),
                     _esc(_fmt_dur(h.get("duration_s"))),
+                    ("pos" if float(h.get("total_pnl", 0) or 0) > 0 else ("neg" if float(h.get("total_pnl", 0) or 0) < 0 else "")),
+                    f"{float(h.get('total_pnl', 0) or 0):+,.2f}",
                 )
             )
         hist_block += "</tbody></table></div>"
