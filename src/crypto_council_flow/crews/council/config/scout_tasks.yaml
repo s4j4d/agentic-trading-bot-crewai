@@ -7,14 +7,15 @@ market_scout_task:
     with sufficient liquidity. Do not treat a large 24-hour percentage gain
     as equivalent to volatility.
 
-    The independent scouting calls were already executed CONCURRENTLY for you
-    before this task began — their results are attached below. Use them
-    directly. Do NOT re-call: trending_coins, momentum_screener,
-    volatility_screener, new_listings, exchange_markets. Only call the
-    exchange confirmation tools yourself (exchange_batch_ticker,
-    exchange_ohlc, exchange_ticker).
-    If an attached tool result is missing or an error, you may re-call that
-    tool once with the same arguments.
+    Call each required tool at most once unless a call fails.
+    Emit the five independent scouting tool calls (trending_coins,
+    momentum_screener, volatility_screener, new_listings, exchange_markets)
+    in a SINGLE response — they have no dependencies on each other and
+    will be executed concurrently. Do not chain them one per turn.
+    If a tool call errors or returns nothing usable, retry it once with
+    default arguments before moving on.
+    After collecting the results, analyze the existing observations.
+    Do not repeat successful tool calls.
 
     A tool call is never a valid final answer. After the tool results are
     in, you MUST write out the final JSON object described below as plain
@@ -22,16 +23,38 @@ market_scout_task:
     of steps, skip remaining tool calls and write the JSON from whatever
     data you already have.
 
-    0. exchange_markets (quote_currency="usdt", only_active=true, max_results=50)
-       (attached below) Returns only a total_count plus a small sample — use
-       it SOLELY to check whether a candidate is tradeable.
+    Run all seven scouting tools — the four CoinGecko screeners plus the
+    three exchange tools:
 
-    1. trending_coins (top_n=5)  (attached below)
+    0. exchange_markets (quote_currency="usdt", only_active=true, max_results=50)
+       Returns only a total_count plus a small sample — use it SOLELY to check
+       whether a candidate is tradeable. Do NOT analyse the sample list.
+       Confirm each finalist with exchange_ticker.
+
+    1. trending_coins (top_n=5)
+       Identify coins receiving unusually high market attention.
+       Use this as an attention signal, not as a volatility measurement.
+
     2. momentum_screener
-       (top_n=10, min_volume_usd=5000000, max_market_cap_rank=500) (attached below)
+       (top_n=10, min_volume_usd=5000000, max_market_cap_rank=500)
+       Identify liquid coins with strong recent momentum across multiple
+       timeframes. Use this for momentum and volume, not as the primary
+       volatility measurement.
+
     3. volatility_screener
-       (top_n=10, min_volume_usd=1000000, max_market_cap_rank=500) (attached below)
-    4. new_listings (top_n=10)  (attached below)
+       (top_n=10, min_volume_usd=1000000, max_market_cap_rank=500)
+       This is the PRIMARY volatility source.
+       Prioritize:
+       - recent realized volatility
+       - maximum rolling 24h range
+       - frequency of significant hourly price movements
+       - sufficient trading volume
+
+    4. new_listings (top_n=10)
+       Identify newer market entries that may experience elevated volatility
+       and active price discovery. Require adequate liquidity before selection.
+       Do not assume id ordering is an exact listing-date ranking.
+
     5. exchange_batch_ticker (one call with all top candidate symbols)
        Confirm live price and 24h change on the exchange for your leading
        candidates in one concurrent call. Drop candidates with no exchange
@@ -40,9 +63,6 @@ market_scout_task:
     6. exchange_ohlc (symbol, timeframe="1d", days=30, top candidates only)
        Use recent exchange candles to confirm tradable volatility before
        final ranking.
-
-    PRE-FETCHED TOOL RESULTS (ran concurrently):
-    {scout_snapshot_json}
 
     Evaluate candidates using:
 
