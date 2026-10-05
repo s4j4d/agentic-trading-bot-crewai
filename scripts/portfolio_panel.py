@@ -79,27 +79,119 @@ def _load_history(limit: int = 60) -> list[dict]:
     return rows[-limit:]
 
 
-def _sparkline(values: list[float], width: int = 560, height: int = 120) -> str:
-    """Minimal inline SVG line chart. Empty string when < 2 points."""
+def _axis_chart(
+    values: list[float],
+    labels: list[str] | None = None,
+    *,
+    y_title: str = "",
+    x_title: str = "Portfolio cycle",
+    baseline: float | None = None,
+    height: int = 240,
+) -> str:
+    """Inline SVG line chart with labelled x and y axes, gridlines, ticks,
+    and an optional dashed baseline. Empty string when < 2 points."""
     if len(values) < 2:
         return ""
-    lo, hi = min(values), max(values)
-    span = (hi - lo) or 1.0
-    pad = 8
-    step = (width - 2 * pad) / (len(values) - 1)
-    pts = [
-        f"{pad + i * step:.1f},{height - pad - (v - lo) / span * (height - 2 * pad):.1f}"
-        for i, v in enumerate(values)
+    width = 660
+    ml, mr, mt, mb = 74, 14, 14, 44          # margins: y labels, right, top, x labels
+    iw, ih = width - ml - mr, height - mt - mb
+    labels = labels or [str(i + 1) for i in range(len(values))]
+
+    pool = list(values) + ([baseline] if baseline is not None else [])
+    lo, hi = min(pool), max(pool)
+    if hi == lo:
+        hi, lo = hi + max(abs(hi) * 0.01, 1.0), lo - max(abs(lo) * 0.01, 1.0)
+    pad = (hi - lo) * 0.10
+    lo, hi = lo - pad, hi + pad
+    span = hi - lo
+
+    def yx(v: float) -> float:
+        return ml + iw * (v - lo) / span
+
+    def yy(v: float) -> float:
+        return mt + ih - ih * (v - lo) / span
+
+    step = iw / (len(values) - 1)
+    pts = [(ml + i * step, yy(v)) for i, v in enumerate(values)]
+    poly = " ".join(f"{x:.1f},{y:.1f}" for x, y in pts)
+    area = f"{ml},{mt + ih} " + poly + f" {ml + iw:.1f},{mt + ih}"
+
+    up = values[-1] >= values[0]
+    stroke = "#6fdc8c" if up else "#f08a8a"
+
+    out = [
+        f'<svg viewBox="0 0 {width} {height}" class="chart" role="img" '
+        f'aria-label="{_esc(y_title or "value")} by {_esc(x_title)}">'
     ]
-    return (
-        f'<svg viewBox="0 0 {width} {height}" class="spark" role="img">'
-        f'<polyline points="{" ".join(pts)}" fill="none" stroke="var(--accent)" stroke-width="2"/>'
-        + "".join(
-            f'<circle cx="{p.split(",")[0]}" cy="{p.split(",")[1]}" r="2.5" class="dot"/>'
-            for p in pts
+    # horizontal gridlines + y tick labels
+    for k in range(5):
+        v = lo + span * k / 4
+        y = yy(v)
+        out.append(
+            f'<line x1="{ml}" y1="{y:.1f}" x2="{ml + iw}" y2="{y:.1f}" '
+            f'class="grid"/>'
+            f'<text x="{ml - 8}" y="{y + 4:.1f}" class="tick" text-anchor="end">'
+            f"{_esc(_compact(v))}</text>"
         )
-        + "</svg>"
+    # y axis title (rotated)
+    if y_title:
+        out.append(
+            f'<text x="16" y="{mt + ih / 2:.1f}" class="axis-title" '
+            f'transform="rotate(-90 16 {mt + ih / 2:.1f})" text-anchor="middle">'
+            f"{_esc(y_title)}</text>"
+        )
+    # x axis line + tick labels (first / middle / last, no overlap)
+    out.append(
+        f'<line x1="{ml}" y1="{mt + ih}" x2="{ml + iw}" y2="{mt + ih}" class="axis"/>'
     )
+    for idx in sorted({0, len(values) // 2, len(values) - 1}):
+        x = pts[idx][0]
+        anchor = "start" if idx == 0 else ("end" if idx == len(values) - 1 else "middle")
+        out.append(
+            f'<text x="{x:.1f}" y="{mt + ih + 18}" class="tick" text-anchor="{anchor}">'
+            f"{_esc(labels[idx][:16])}</text>"
+        )
+        out.append(f'<line x1="{x:.1f}" y1="{mt + ih}" x2="{x:.1f}" y2="{mt + ih + 5}" class="axis"/>')
+    # baseline (e.g. starting account value)
+    if baseline is not None:
+        by = yy(baseline)
+        out.append(
+            f'<line x1="{ml}" y1="{by:.1f}" x2="{ml + iw}" y2="{by:.1f}" class="base"/>'
+            f'<text x="{ml + iw}" y="{by - 6:.1f}" class="tick" text-anchor="end">'
+            f"start {_esc(_compact(baseline))}</text>"
+        )
+    # series: area + line + dots
+    out.append(f'<polygon points="{area}" fill="{stroke}" opacity="0.10"/>')
+    out.append(f'<polyline points="{poly}" fill="none" stroke="{stroke}" stroke-width="2"/>')
+    out += [
+        f'<circle cx="{x:.1f}" cy="{y:.1f}" r="3" fill="{stroke}"/>' for x, y in pts
+    ]
+    # endpoint callout
+    ex, ey = pts[-1]
+    out.append(
+        f'<circle cx="{ex:.1f}" cy="{ey:.1f}" r="4.5" fill="{stroke}" class="end"/>'
+        f'<text x="{ex - 6:.1f}" y="{ey - 10:.1f}" class="tick" text-anchor="end">'
+        f"{_esc(_compact(values[-1]))}</text>"
+    )
+    if x_title:
+        out.append(
+            f'<text x="{ml + iw / 2:.1f}" y="{height - 6}" class="axis-title" '
+            f'text-anchor="middle">{_esc(x_title)}</text>'
+        )
+    out.append("</svg>")
+    return "".join(out)
+
+
+def _compact(v: float) -> str:
+    """Short number for axis ticks: 12.3k / 1.20M."""
+    a = abs(v)
+    if a >= 1_000_000:
+        return f"{v / 1_000_000:.2f}M"
+    if a >= 1_000:
+        return f"{v / 1_000:.1f}k"
+    if a >= 10:
+        return f"{v:,.0f}"
+    return f"{v:.2f}"
 
 
 def _lvl(v) -> str:
@@ -155,6 +247,8 @@ def build() -> str:
     single_cap = account * max_single / 100
     expos_pct_of_cap = min(100.0, exposure / max_total * 100) if max_total else 0
     plan_dur = _fmt_dur(snap.get("duration_s"))
+    pnl_data = snap.get("pnl") or {}
+    portfolio_worth = float(pnl_data.get("equity", account) or account)
 
     # --- KPI cards ---
     kpis = (
@@ -164,7 +258,7 @@ def build() -> str:
         f"<div class='bar'><div style='width:{expos_pct_of_cap:.0f}%'></div></div></div>"
         f"<div class='card kpi'><span>Cash remaining</span><b>{_fmt(cash, cur)}</b></div>"
         f"<div class='card kpi'><span>Positions</span><b>{len(open_acts)} <small>open / {len(actions)} actions</small></b></div>"
-        f"<div class='card kpi'><span>Account</span><b>{_fmt(account, cur)}</b></div>"
+        f"<div class='card kpi'><span>Portfolio worth</span><b>{_fmt(portfolio_worth, cur)}</b></div>"
         f"<div class='card kpi'><span>Single-coin cap</span><b>{_fmt(single_cap, cur)}</b></div>"
         f"<div class='card kpi'><span>Portfolio time</span><b>⏱ {plan_dur}</b></div>"
         "</div>"
@@ -206,7 +300,6 @@ def build() -> str:
     )
 
     # --- P&L from the paper ledger (filled at current price each cycle) ---
-    pnl_data = snap.get("pnl") or {}
     if pnl_data:
         total_pnl = float(pnl_data.get("total_pnl", 0) or 0)
         realized = float(pnl_data.get("realized_pnl", 0) or 0)
@@ -247,22 +340,52 @@ def build() -> str:
             "<p>No ledger data yet — P&amp;L is computed after the first portfolio cycle fills the paper ledger (output/paper_ledger.json).</p></div>"
         )
 
-    # --- history ---
-    hist_block = "<div class='card'><h2>Cycle history</h2>"
+# --- history: total portfolio worth over cycles ---
+    hist_block = "<div class='card'><h2>Portfolio value over time</h2>"
     if len(hist) >= 2:
+        equity_series = []
+        labels = []
+        for h in hist:
+            eq = h.get("equity")
+            if eq is None:
+                # pre-ledger cycles: fall back to account + unrealized-free estimate
+                eq = float(h.get("account_size", 0) or 0) - float(h.get("cash_remaining", 0) or 0) + float(h.get("cash_remaining", 0) or 0)
+            equity_series.append(float(eq or 0))
+            labels.append("#%s %s" % (h.get("cycle", "?"), str(h.get("ts", ""))[5:16]))
+        start_val = float(hist[0].get("account_size", 0) or 0) or None
+        chart = _axis_chart(
+            equity_series,
+            labels,
+            y_title="Total portfolio worth (%s)" % cur,
+            x_title="Portfolio cycle",
+            baseline=start_val,
+        )
+        if chart:
+            gain = equity_series[-1] - equity_series[0]
+            pct = (gain / equity_series[0] * 100) if equity_series[0] else 0.0
+            hist_block += (
+                "<p class='muted'>Total portfolio worth = account value + open-position gains, "
+                "per portfolio cycle (dashed line = starting account value).</p>"
+                + chart
+                + "<p class='muted'>Cycle-over-cycle change: <b class='%s'>%+.2f %s (%+.2f%%)</b></p>"
+                % ("pos" if gain >= 0 else "neg", gain, cur, pct)
+            )
+        else:
+            hist_block += "<p class='muted'>Not enough cycles to plot.</p>"
         hist_block += (
-            "<p class='muted'>Total invested (%s) per portfolio cycle</p>" % cur
-            + _sparkline([float(h.get("total_target", 0) or 0) for h in hist])
-            + "<table><thead><tr><th>Cycle</th><th>Time (UTC)</th><th>Invested</th>"
+            "<table><thead><tr><th>Cycle</th><th>Time (UTC)</th><th>Worth</th><th>Invested</th>"
             "<th>Exposure</th><th>Cash</th><th>Positions</th><th>Took</th><th>Total P&L</th></tr></thead><tbody>"
         )
         for h in reversed(hist[-12:]):
+            eq_val = float(h.get("equity", 0) or 0)
             hist_block += (
                 "<tr><td>#%s</td><td><small>%s</small></td><td class='num'>%s</td>"
+                "<td class='num'>%s</td>"
                 "<td class='num'>%.1f%%</td><td class='num'>%s</td><td class='num'>%s</td>"
                 "<td class='num'>%s</td><td class='num %s'>%s</td></tr>"
                 % (
                     _esc(h.get("cycle", "?")), _esc(str(h.get("ts", ""))[:16]),
+                    f"{eq_val:,.0f}",
                     f"{float(h.get('total_target', 0) or 0):,.0f}",
                     float(h.get("total_exposure_pct", 0) or 0),
                     f"{float(h.get('cash_remaining', 0) or 0):,.0f}",
@@ -274,7 +397,7 @@ def build() -> str:
             )
         hist_block += "</tbody></table></div>"
     else:
-        hist_block += "<p class='muted'>Only %d cycle(s) logged — trend appears after 2+ cycles.</p></div>" % len(hist)
+        hist_block += "<p class='muted'>Only %d cycle(s) logged — the chart appears after 2+ cycles.</p></div>" % len(hist)
 
     # --- scout snapshot ---
     scout_block = "<div class='card'><h2>Signal snapshot</h2>"
@@ -335,8 +458,14 @@ th { opacity: .6; font-weight: 600; font-size: .8em; }
 .warn { border-color: #6b5a2a; } .warn h2 { color: #e8c15a; }
 .empty { text-align: center; padding: 40px 20px; }
 code { background: #00000055; padding: 2px 6px; border-radius: 4px; }
-.spark { width: 100%; height: 120px; margin: 6px 0 12px; }
-.spark .dot { fill: var(--accent, #4da3ff); }
+.chart { width: 100%; height: auto; margin: 10px 0 12px; display: block; }
+.chart .grid { stroke: var(--border, #2a2a2a); stroke-width: 1; stroke-dasharray: 3 4; }
+.chart .axis { stroke: var(--border, #555); stroke-width: 1.2; }
+.chart .base { stroke: var(--muted-foreground, #8a8a8a); stroke-width: 1.2; stroke-dasharray: 6 5; opacity: .75; }
+.chart .tick { fill: var(--muted-foreground, #9a9a9a); font-size: 11px; font-family: inherit; }
+.chart .axis-title { fill: var(--muted-foreground, #b0b0b0); font-size: 11.5px; font-weight: 600; font-family: inherit; }
+.chart circle { opacity: .9; }
+.chart circle.end { opacity: 1; stroke: var(--card, #161616); stroke-width: 2; }
 </style></head><body>
 <h1>""" + _esc(title) + """</h1>
 """ + body + """
