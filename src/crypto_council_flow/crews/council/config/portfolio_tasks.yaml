@@ -25,9 +25,15 @@ portfolio_management_task:
     Per-coin analysis verdicts — your primary evidence for keep/trim/close:
     {analysis_verdicts_json}
 
-    ATR snapshot for deterministic risk levels (JSON object mapping
-    coin_id to {{"current_price", "atr_pct"}}):
+    Computed stop/take-profit levels per coin (JSON object mapping coin_id
+    to {{"current_price", "atr_pct"}}). The deterministic levels are:
+    stop = 0.5 x ATR below entry, take = 1 x ATR above entry:
     {risk_levels_json}
+
+    For each action, set stop_loss/take_profit from the computed levels.
+    Your numbers are kept only if stop is below entry and take above
+    entry AND both are within 20% of the computed values; otherwise the
+    computed values are used.
 
     Only coins in the opportunities list are eligible for new or increased
     exposure. Entries whose reason mentions "carried with neutral score"

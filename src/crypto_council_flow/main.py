@@ -658,10 +658,14 @@ def _extract_portfolio_plan(raw_output: str) -> dict[str, Any]:
 
 
 def _risk_levels_for(
-    current_price: object, atr_pct: object
+    current_price: object,
+    atr_pct: object,
+    stop_atr_mult: float = 0.5,
+    take_atr_mult: float = 1.0,
 ) -> tuple[float | None, float | None]:
-    """Deterministic 1x-ATR stop + 2:1 take-profit (pure math, no network).
+    """Deterministic ATR-based stop/take (pure math, no network).
 
+    0.5x ATR stop and 1x ATR take (2:1 reward-risk).
     Floor: tiny ATR (<1%) uses 1% so stablecoins still get a guardrail.
     Invalid (non-positive price or ATR) returns (None, None).
     Close actions use identical levels — informational guardrails, not orders.
@@ -674,8 +678,8 @@ def _risk_levels_for(
     if price <= 0 or atr <= 0:
         return (None, None)
     eff_pct = max(atr, 1.0)
-    stop = round(price * (1 - (eff_pct * 0.5) / 100), 6)
-    take = round(price * (1 + (eff_pct) / 100), 6)
+    stop = round(price * (1 - (eff_pct * stop_atr_mult) / 100), 6)
+    take = round(price * (1 + (eff_pct * take_atr_mult) / 100), 6)
     return (stop, take)
 
 
@@ -762,14 +766,53 @@ def _apply_max_hold(
     return plan
 
 
-def _backfill_risk_levels(
-    plan: dict[str, Any], snapshot: dict[str, dict[str, float]]
-) -> dict[str, Any]:
-    """Fill missing stop_loss/take_profit from the ATR snapshot (deterministic).
+def _within_pct(value: object, ref: float | None, pct: float) -> bool:
+    if ref is None or ref <= 0:
+        return False
+    try:
+        v = float(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return False
+    return abs(v - ref) <= (pct / 100.0) * ref
 
-    Existing crew-supplied levels are kept; coins without a snapshot entry
-    stay null. Close actions get identical informational levels (their
-    target stays 0) — guardrails for the paper record, not orders.
+
+def _within_pct_tolerance() -> float:
+    """Crew SL/TP tolerance around the computed ATR levels (env-overridable)."""
+    try:
+        return float(os.getenv("COUNCIL_RISK_LEVEL_TOLERANCE_PCT", "20"))
+    except ValueError:
+        return 20.0
+
+
+def _sane_levels(
+    stop: object, take: object, entry: float | None
+) -> bool:
+    """Structural check: stop must sit on the loss side of entry and take on
+    the profit side. The flow is long-only, so loss side = below entry and
+    profit side = above entry. Non-numeric or non-positive -> insane."""
+    if entry is None or entry <= 0:
+        return False
+    try:
+        s = float(stop)  # type: ignore[arg-type]
+        t = float(take)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return False
+    if s <= 0 or t <= 0:
+        return False
+    return s < entry and t > entry
+
+
+def _backfill_risk_levels(
+    plan: dict[str, Any], candidates: dict[str, dict[str, Any]]
+) -> dict[str, Any]:
+    """Anchor each action's stop/take to the deterministic ATR set.
+
+    Per action, the crew's explicit numbers are kept only if BOTH hold:
+      1. structure: stop below entry and take above entry (long-only flow),
+      2. proximity: each within 20% of the computed ATR stop/take.
+    Otherwise the computed ATR values are used. Any remaining unknowns
+    (missing entry price, missing candidate) fall back to the computed set.
+    Close actions get identical informational levels; their target stays 0.
     """
     actions = plan.get("actions", []) if isinstance(plan, dict) else []
     if not isinstance(actions, list):
@@ -777,17 +820,41 @@ def _backfill_risk_levels(
     for a in actions:
         if not isinstance(a, dict):
             continue
-        snap = snapshot.get(a.get("coin_id", "")) if isinstance(snapshot, dict) else None
-        if not isinstance(snap, dict):
+        cand = candidates.get(a.get("coin_id", "")) if isinstance(candidates, dict) else None
+        if not isinstance(cand, dict):
             a.setdefault("stop_loss", None)
             a.setdefault("take_profit", None)
             continue
-        # Deterministic ATR levels are AUTHORITATIVE — the crew may supply
-        # garbage free-text numbers (e.g. 10x off current price), so we
-        # always overwrite rather than trusting crew-supplied values.
-        stop, take = _risk_levels_for(snap.get("current_price"), snap.get("atr_pct"))
-        a["stop_loss"] = stop
-        a["take_profit"] = take
+
+        computed_stop, computed_take = _risk_levels_for(
+            cand.get("current_price"), cand.get("atr_pct")
+        )
+
+        try:
+            entry = float(cand.get("current_price"))  # type: ignore[arg-type]
+        except (TypeError, ValueError):
+            entry = None
+
+        crew_stop = a.get("stop_loss")
+        crew_take = a.get("take_profit")
+
+        # No computed level at all -> keep crew values if sane, else None.
+        if computed_stop is None or computed_take is None:
+            if _sane_levels(crew_stop, crew_take, entry):
+                a["stop_loss"], a["take_profit"] = crew_stop, crew_take
+            else:
+                a.setdefault("stop_loss", None)
+                a.setdefault("take_profit", None)
+            continue
+
+        keep_crew = (
+            _sane_levels(crew_stop, crew_take, entry)
+            and _within_pct(crew_stop, computed_stop, _within_pct_tolerance())
+            and _within_pct(crew_take, computed_take, _within_pct_tolerance())
+        )
+        if not keep_crew:
+            a["stop_loss"] = computed_stop
+            a["take_profit"] = computed_take
     return plan
 
 

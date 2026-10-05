@@ -18,8 +18,8 @@ class TestRiskLevelsTool:
             atr_pct=2.5,
         )
         data = json.loads(out)
-        assert data["stop_loss"] == 97.5
-        assert data["take_profit"] == 105.0
+        assert data["stop_loss"] == 98.75
+        assert data["take_profit"] == 102.5
 
 
 class TestRiskLevelsFor:
@@ -28,12 +28,12 @@ class TestRiskLevelsFor:
     def test_standard_levels(self):
         from crypto_council_flow.main import _risk_levels_for
 
-        assert _risk_levels_for(100.0, 2.5) == (97.5, 105.0)
+        assert _risk_levels_for(100.0, 2.5) == (98.75, 102.5)
 
     def test_tiny_atr_floored_at_1pct(self):
         from crypto_council_flow.main import _risk_levels_for
 
-        assert _risk_levels_for(200.0, 0.2) == (198.0, 204.0)
+        assert _risk_levels_for(200.0, 0.2) == (199.0, 202.0)
 
     def test_invalid_returns_none(self):
         from crypto_council_flow.main import _risk_levels_for
@@ -72,7 +72,8 @@ class TestAtrSnapshotFor:
 
 
 class TestBackfillRiskLevels:
-    """Deterministic backfill: missing levels filled from snapshot, close included."""
+    """Deterministic backfill with crew-level validation:
+    sane + within 20% of computed -> kept; otherwise computed."""
 
     def test_fills_missing_levels_from_snapshot(self):
         from crypto_council_flow.main import _backfill_risk_levels
@@ -89,24 +90,61 @@ class TestBackfillRiskLevels:
                 "bitcoin": {"current_price": 200.0, "atr_pct": 0.2}}
         out = _backfill_risk_levels(plan, snap)
         by_coin = {a["coin_id"]: a for a in out["actions"]}
-        assert (by_coin["solana"]["stop_loss"], by_coin["solana"]["take_profit"]) == (97.5, 105.0)
+        assert (by_coin["solana"]["stop_loss"], by_coin["solana"]["take_profit"]) == (98.75, 102.5)
         # close gets identical informational levels, target stays 0
-        assert (by_coin["bitcoin"]["stop_loss"], by_coin["bitcoin"]["take_profit"]) == (198.0, 204.0)
+        assert (by_coin["bitcoin"]["stop_loss"], by_coin["bitcoin"]["take_profit"]) == (199.0, 202.0)
         assert by_coin["bitcoin"]["target"] == 0.0
 
-    def test_keeps_existing_levels_and_none_without_snapshot(self):
+    def test_keeps_crew_levels_within_20pct(self):
         from crypto_council_flow.main import _backfill_risk_levels
 
+        # atr 2.5% -> computed stop 98.75, take 102.5; crew values inside 20%
         plan = {"actions": [
             {"coin_id": "solana", "symbol": "SOL", "action": "open",
              "current": 0.0, "target": 1500.0, "reason": "Top.",
-             "stop_loss": 90.0, "take_profit": 110.0},
+             "stop_loss": 98.0, "take_profit": 104.0},
+        ]}
+        snap = {"solana": {"current_price": 100.0, "atr_pct": 2.5}}
+        out = _backfill_risk_levels(plan, snap)
+        a = out["actions"][0]
+        assert (a["stop_loss"], a["take_profit"]) == (98.0, 104.0)
+
+    def test_rejects_insane_and_replaces_with_computed(self):
+        from crypto_council_flow.main import _backfill_risk_levels
+
+        # stop above entry, take below entry -> insane -> computed wins
+        plan = {"actions": [
+            {"coin_id": "solana", "symbol": "SOL", "action": "open",
+             "current": 0.0, "target": 1500.0, "reason": "Top.",
+             "stop_loss": 110.0, "take_profit": 90.0},
+        ]}
+        snap = {"solana": {"current_price": 100.0, "atr_pct": 2.5}}
+        out = _backfill_risk_levels(plan, snap)
+        a = out["actions"][0]
+        assert (a["stop_loss"], a["take_profit"]) == (98.75, 102.5)
+
+    def test_rejects_far_from_computed_and_replaces(self):
+        from crypto_council_flow.main import _backfill_risk_levels
+
+        # sane side but far beyond 20% tolerance -> computed wins
+        plan = {"actions": [
+            {"coin_id": "solana", "symbol": "SOL", "action": "open",
+             "current": 0.0, "target": 1500.0, "reason": "Top.",
+             "stop_loss": 80.0, "take_profit": 130.0},
+        ]}
+        snap = {"solana": {"current_price": 100.0, "atr_pct": 2.5}}
+        out = _backfill_risk_levels(plan, snap)
+        a = out["actions"][0]
+        assert (a["stop_loss"], a["take_profit"]) == (98.75, 102.5)
+
+    def test_none_without_snapshot(self):
+        from crypto_council_flow.main import _backfill_risk_levels
+
+        plan = {"actions": [
             {"coin_id": "ghost", "symbol": "GHO", "action": "open",
              "current": 0.0, "target": 500.0, "reason": "New.",
              "stop_loss": None, "take_profit": None},
         ]}
         out = _backfill_risk_levels(plan, {})
-        by_coin = {a["coin_id"]: a for a in out["actions"]}
-        assert (by_coin["solana"]["stop_loss"], by_coin["solana"]["take_profit"]) == (90.0, 110.0)
-        assert by_coin["ghost"]["stop_loss"] is None
-        assert by_coin["ghost"]["take_profit"] is None
+        assert out["actions"][0]["stop_loss"] is None
+        assert out["actions"][0]["take_profit"] is None

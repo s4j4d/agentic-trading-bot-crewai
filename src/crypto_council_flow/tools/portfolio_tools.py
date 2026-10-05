@@ -356,7 +356,7 @@ class RiskLevelsTool(BaseTool):
     name: str = "risk_levels"
     description: str = (
         "Computes deterministic stop-loss / take-profit price levels from ATR. "
-        "Stop is 1x ATR below price, take-profit is 2:1 reward-risk above. "
+        "Stop is 0.5x ATR below price, take-profit is 1x ATR above (2:1 reward-risk). "
         "Pure math, no network calls. Close actions get identical levels."
     )
     args_schema: Type[BaseModel] = RiskLevelsInput
@@ -382,8 +382,8 @@ class RiskLevelsTool(BaseTool):
                 })
             # Floor tiny ATR at 1% so stablecoins still get a guardrail.
             eff_pct = max(atr, 1.0)
-            stop = round(price * (1 - eff_pct / 100), 6)
-            take = round(price * (1 + 2 * eff_pct / 100), 6)
+            stop = round(price * (1 - 0.5 * eff_pct / 100), 6)
+            take = round(price * (1 + eff_pct / 100), 6)
             return json.dumps({
                 "coin_id": coin_id,
                 "current_price": price,
