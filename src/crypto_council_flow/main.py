@@ -7,8 +7,8 @@ Scheduling model
 The flow implements two nested loops inside a single long-running process:
 
   Scout loop  (every 2 hours)
-    CouncilScoutCrew scans trending / momentum / catalyst data and produces
-    a ranked list of 3-7 coin opportunities stored in flow state.
+    CouncilScoutCrew scans trending / momentum / volatility / new-listing
+    data and produces a ranked list of 3 coin opportunities in flow state.
 
   Analysis loop  (every 5 minutes, operates on the current scout list)
     For each coin in the scout list, CouncilAnalysisCrew runs the three-agent

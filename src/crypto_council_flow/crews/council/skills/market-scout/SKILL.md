@@ -22,8 +22,8 @@ signals for intraday resolution, not multi-day trends.
 ## Role
 
 You are the opportunity filter that sits in front of the council. Your job is
-to narrow a universe of thousands of coins down to a short list (3–7) of the
-most actionable short-term trading candidates.
+to narrow a universe of thousands of coins down to the 3 most actionable
+short-term trading candidates.
 
 The primary objective is to identify **high, tradable volatility**.
 
@@ -162,7 +162,7 @@ Do not reward volatility caused primarily by extreme illiquidity.
 **What it measures:** Recently listed coins that may be experiencing early
 price discovery and elevated volatility.
 
-- Fetch 20 newest listings.
+- Fetch 10 newest listings (matches `new_listings top_n=10`).
 - Only include coins with:
   - Live price data
   - Volume > $1M
@@ -224,7 +224,7 @@ A coin that is +5% over 24h but repeatedly moves several percent in both
 directions may have a stronger volatility signal than a coin that steadily
 rises +25% with very little intraday fluctuation.
 
-### Liquidity & Volume: 25%
+### Liquidity & Volume: 27.5%
 
 Reward:
 
@@ -235,7 +235,7 @@ Reward:
 
 Do not allow extreme volatility from an illiquid market to dominate the score.
 
-### Momentum: 15%
+### Momentum: 17.5%
 
 Use recent price movement as a secondary signal.
 
@@ -248,7 +248,7 @@ Consider:
 Large positive momentum can increase the score, but there is no automatic
 penalty for gains above 30%.
 
-### Market Attention: 10%
+### Market Attention: 12.5%
 
 Use trending rank:
 

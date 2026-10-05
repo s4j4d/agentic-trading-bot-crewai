@@ -70,13 +70,18 @@ def test_analysis_and_portfolio_crews_have_time_budgets() -> None:
 
 
 def test_scout_crew_has_time_budget_and_narrowed_prompt() -> None:
-    """Plan Task 3: scout shrunk to 3 finalists with a 5-min budget."""
+    """Scout is budgeted and pinned to exactly 3 finalists.
+
+    The budget was raised from 300s to 400s in 868cd7c (per-coin analysis verdicts
+    plus max_hold_days) and the prompt wording moved from "max 3" to "exactly 3";
+    this assertion was left behind and has failed on a clean tree ever since.
+    """
     from crypto_council_flow.crews.council.council_crew import CouncilScoutCrew
 
     crew = CouncilScoutCrew().crew()
     (scout,) = crew.agents
     assert getattr(scout, "max_iter") == 8
-    assert getattr(scout, "max_execution_time") == 300
+    assert getattr(scout, "max_execution_time") == 400
     (t,) = [t for t in crew.tasks if t.name == "market_scout_task"]
     assert "3-7" not in t.description
-    assert "max 3" in t.description
+    assert "exactly 3" in t.description

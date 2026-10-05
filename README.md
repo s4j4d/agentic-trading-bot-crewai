@@ -14,7 +14,7 @@ Three-step `CryptoCouncilFlow` (`src/crypto_council_flow/main.py`):
 
 1. **`run_scout`** (every 2h) — `CouncilScoutCrew` (single `market_scout` agent)
    scans CoinGecko screeners + exchange data and emits a ranked shortlist of
-   3–7 `CoinOpportunity` records (score 0–100, risk tier, one-sentence reason).
+   3 `CoinOpportunity` records (score 0–100, risk tier, one-sentence reason).
 2. **`analyse_coins`** (every 5m, over the current scout list) — for each coin,
    `CouncilAnalysisCrew` runs a sequential pipeline:
    `technical_analyst` → `sentiment_analyst` → `risk_manager`.
@@ -66,7 +66,7 @@ falls back to the unfiltered ranking if the exchange list is unavailable.
 
 | Agent | Role | Key tools |
 |---|---|---|
-| `market_scout` | Find 3–7 tradable short-term opportunities | `ExchangeMarketsTool`, `ExchangeBatchTickerTool`, `ExchangeOHLCTool`, `TrendingCoinsTool`, `MomentumScreenerTool`, `VolatilityScreenerTool`, `NewListingsTool`, `UpcomingCatalystsTool` |
+| `market_scout` | Find 3 tradable short-term opportunities | `ExchangeMarketsTool`, `ExchangeBatchTickerTool`, `ExchangeOHLCTool`, `TrendingCoinsTool`, `MomentumScreenerTool`, `VolatilityScreenerTool`, `NewListingsTool` |
 | `technical_analyst` | Chart + indicator read per coin | `RSI`, `MACD`, `BollingerBands`, `EMA-Cross`, `ATR` (exchange 1h OHLC, shared cache via `COUNCIL_OHLC_TTL_S`, 6s CoinGecko throttle) |
 | `sentiment_analyst` | Market psychology per coin | `FearGreedIndex`, `CryptoNews`, `CommunitySentiment`, `MarketDominance` |
 | `risk_manager` | Position sizing, VaR, trade plan | `PositionSizing` (Kelly + fixed-risk), `LiquidationPrice`, `PortfolioVaR`, `AssetCorrelation` |
