@@ -148,7 +148,7 @@ Console prints per-cycle timings (`⏱ Scout/Analysis/Portfolio`) and a
 | OHLC cache / throttle | `tools/technical_indicators.py`, `COUNCIL_OHLC_TTL_S` env | 5-min TTL, 6s min gap |
 | Exposure caps | `--max-total-exposure` / `--max-single-position` | 60% / 20% |
 | Exchange backend | `EXCHANGE*` env (`EXCHANGE_API_BASE`, `EXCHANGE_QUOTE`) | Nobitex apiv2, usdt quote |
-| CrewAI generic memory | `COUNCIL_MEMORY` env | `false` (off; trade journal is separate) |
+| CrewAI generic memory | `USE_MEMORY` env | `false` (off; trade journal is separate) |
 | Volatility screener exchange filter | `require_exchange_listing` on `VolatilityScreenerTool` | `true` |
 
 ## Tests

@@ -108,7 +108,7 @@ memory = Memory(
 # Task 6: gate CrewAI memory behind env var (default off — generic
 # conversation memory adds Ollama embed latency on every agent step with
 # no trading value; real-trading memory is Task 9 trade journal).
-_USE_MEMORY = os.getenv("COUNCIL_MEMORY", "false").lower() == "true"
+_USE_MEMORY = os.getenv("USE_MEMORY", "false").lower() == "true"
 
 _CONFIG_DIR = Path(__file__).parent / "config"
 _SKILLS_DIR = Path(__file__).parent / "skills"
