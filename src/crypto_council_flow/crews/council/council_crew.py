@@ -67,7 +67,6 @@ from crypto_council_flow.tools.scout_tools import (
 from crypto_council_flow.tools.exchange_base import (
     ExchangeMarketsTool,
     ExchangeOHLCTool,
-    ExchangeTickerTool,
     ExchangeBatchTickerTool,
 )
 from crypto_council_flow.tools.portfolio_tools import (
@@ -169,7 +168,6 @@ def _load_agent_skill(skill_dir_name: str) -> list:
 def _scout_tools() -> list:
     return [
         ExchangeMarketsTool(),
-        ExchangeTickerTool(),
         ExchangeBatchTickerTool(),
         ExchangeOHLCTool(),
         TrendingCoinsTool(),

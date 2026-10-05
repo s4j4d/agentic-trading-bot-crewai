@@ -235,7 +235,7 @@ class ExchangeMarketsTool(BaseTool):
         "max_results markets (symbol, base, quote). Use it ONLY to check whether "
         "a candidate coin is tradeable — do NOT treat the sample as analysis input. "
         "Defaults to quote_currency='usdt', only_active=true, max_results=50. "
-        "Confirm specific coins with exchange_ticker, not this list."
+        "Confirm specific coins with exchange_batch_ticker, not this list."
     )
     args_schema: Type[BaseModel] = ExchangeMarketsInput
 
@@ -268,7 +268,7 @@ class ExchangeMarketsTool(BaseTool):
                     "source": f"{client.__class__.__name__}_markets",
                     "total_count": total_count,
                     "returned": len(sample),
-                    "note": "Sample only — verify candidates with exchange_ticker.",
+                    "note": "Sample only — verify candidates with exchange_batch_ticker.",
                     "markets": sample,
                 }
             )
@@ -276,10 +276,6 @@ class ExchangeMarketsTool(BaseTool):
             return result
         except Exception as exc:
             return _error(f"exchange_markets failed: {type(exc).__name__}: {exc}")
-
-
-class ExchangeTickerInput(BaseModel):
-    symbol: str = Field(..., description="Exchange symbol, e.g. 'BTCUSDT'.")
 
 
 def _check_symbol(client, symbol: str) -> dict:
@@ -330,36 +326,6 @@ class ExchangeBatchTickerTool(BaseTool):
                 "results": results,
             }
         )
-
-
-class ExchangeTickerTool(BaseTool):
-    """Fetch 24h ticker for a specific symbol."""
-
-    name: str = "exchange_ticker"
-    description: str = (
-        "Returns 24h ticker for a single market: last price, volume, high, low, change%."
-    )
-    args_schema: Type[BaseModel] = ExchangeTickerInput
-
-    def _run(self, symbol: str) -> str:
-        params = {"symbol": symbol}
-        cached = _cache_get(self.name, params)
-        if cached:
-            return cached
-
-        try:
-            client = get_exchange_client()
-            ticker = client.get_ticker(symbol)
-            if ticker is None:
-                return _error(f"symbol not found: {symbol}")
-            ticker["symbol"] = symbol
-            result = json.dumps(
-                {"source": f"{client.__class__.__name__}_ticker", "ticker": ticker}
-            )
-            _cache_put(self.name, params, result)
-            return result
-        except Exception as exc:
-            return _error(f"exchange_ticker failed: {type(exc).__name__}: {exc}")
 
 
 class ExchangeOHLCInput(BaseModel):
@@ -414,7 +380,6 @@ __all__ = [
     "NobitexClient",
     "get_exchange_client",
     "ExchangeMarketsTool",
-    "ExchangeTickerTool",
     "ExchangeBatchTickerTool",
     "ExchangeOHLCTool",
 ]

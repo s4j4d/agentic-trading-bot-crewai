@@ -29,7 +29,7 @@ market_scout_task:
     0. exchange_markets (quote_currency="usdt", only_active=true, max_results=50)
        Returns only a total_count plus a small sample — use it SOLELY to check
        whether a candidate is tradeable. Do NOT analyse the sample list.
-       Confirm each finalist with exchange_ticker.
+       Confirm each finalist with exchange_batch_ticker.
 
        IMPORTANT: every candidate from EVERY other tool result
        (trending_coins, momentum_screener, volatility_screener,
