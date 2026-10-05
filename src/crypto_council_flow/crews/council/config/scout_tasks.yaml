@@ -44,12 +44,12 @@ market_scout_task:
 
        IMPORTANT: every candidate from EVERY other tool result
        (trending_coins, momentum_screener, volatility_screener,
-       new_listings, upcoming_catalysts) must be cross-checked against
-       this exchange market list. A coin that is not listed/active on
-       the exchange's active quote pair is NOT tradable: drop it from
-       the candidate pool entirely, regardless of its
-       volatility/momentum/attention score. The final shortlist must
-       contain only coins whose symbol appears in exchange_markets.
+       new_listings) must be cross-checked against this exchange market
+       list. A coin that is not listed/active on the exchange's active
+       quote pair is NOT tradable: drop it from the candidate pool
+       entirely, regardless of its volatility/momentum/attention score.
+       The final shortlist must contain only coins whose symbol appears in
+       exchange_markets.
 
     1. trending_coins (top_n=5)
        Identify coins receiving unusually high market attention.
@@ -116,11 +116,13 @@ market_scout_task:
 
     Evaluate candidates using:
 
-    - Tradable volatility: 40%
-    - Liquidity and volume: 25%
-    - Momentum: 15%
-    - Market attention: 10%
-    - Catalysts: 10%
+    - Tradable volatility: 42.5%
+    - Liquidity and volume: 27.5%
+    - Momentum: 17.5%
+    - Market attention: 12.5%
+    (These four factors total 100%. There is no separate catalyst
+    factor — judge news or event relevance only if it shows up in the
+    tool results you already have.)
 
     For volatility, prioritize actual volatility measurements from
     volatility_screener over simple 24h percentage change.

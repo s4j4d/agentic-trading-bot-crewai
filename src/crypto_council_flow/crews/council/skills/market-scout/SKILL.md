@@ -3,7 +3,8 @@ name: market-scout
 description: >
   Short-term crypto opportunity identification methodology focused on finding
   highly volatile, liquid, and tradeable cryptocurrency markets. Scans
-  trending coins, price movement, new listings, and catalysts to produce a
+  trending coins, price movement, new listings, and exchange-verified
+  tradeability to produce a
   ranked list of CoinGecko coin IDs suitable for deeper technical and
   sentiment analysis.
 license: MIT
@@ -40,7 +41,7 @@ Prioritize coins that combine:
 - Adequate liquidity
 - Meaningful recent price movement
 - Current market attention
-- Catalysts that could produce continued price movement
+- Confirmation that the coin is listed and tradeable on the exchange
 
 The objective is **volatility that can realistically be traded**, not simply
 the largest percentage gain.
@@ -71,7 +72,7 @@ contract, or an effectively untradeable market should not be rewarded.
   useful trading opportunity. Flag it as speculative rather than automatically
   selecting it.
 
-**Weight in scoring:** 10%
+**Weight in scoring:** 12.5%
 
 ---
 
@@ -97,7 +98,7 @@ and 7d.
 - Consider 7-day direction to determine whether recent movement represents
   continuing activity or an isolated reversal.
 
-**Weight in scoring:** 15%
+**Weight in scoring:** 17.5%
 
 ---
 
@@ -152,7 +153,7 @@ Prefer:
 
 Do not reward volatility caused primarily by extreme illiquidity.
 
-**Weight in scoring:** 40%
+**Weight in scoring:** 42.5%
 
 ---
 
@@ -171,37 +172,6 @@ price discovery and elevated volatility.
 - Give additional consideration to new listings when they combine strong
   volatility with meaningful volume.
 - Do not select a new listing merely because it is new.
-
-**Weight in scoring:** 10%
-
----
-
-### 5. Upcoming Catalysts (`upcoming_catalysts`)
-
-**What it measures:** News and events that may produce significant price
-movement.
-
-Scan important and rising news feeds.
-
-Prioritize catalysts such as:
-
-1. `etf` or `approval`
-2. `listing`
-3. `mainnet` or `upgrade`
-4. `partnership` or `integration`
-5. `airdrop`, `burn`, or `buyback`
-
-Catalysts are useful because they can explain or sustain elevated volatility.
-
-However:
-
-- A bullish catalyst is not required for a coin to qualify.
-- A coin with no identifiable catalyst can still qualify if it has strong,
-  tradeable volatility and liquidity.
-- A large unexplained price movement should trigger additional scrutiny rather
-  than automatic exclusion.
-- Negative catalysts should generally be treated as risk factors rather than
-  automatic exclusions.
 
 **Weight in scoring:** 10%
 
@@ -231,13 +201,12 @@ Compute a score from 0–100 for each candidate.
 
 | Factor | Weight | Signal |
 |---|---:|---|
-| Tradable volatility | 40% | ATR%, realized volatility, intraday range, movement frequency |
-| Liquidity & volume | 25% | 24h volume, liquidity, spread/tradeability |
-| Momentum | 15% | 1h/24h/7d price movement |
-| Market attention | 10% | Trending rank |
-| Catalysts & event potential | 10% | Catalyst strength and relevance |
+| Tradable volatility | 42.5% | ATR%, realized volatility, intraday range, movement frequency |
+| Liquidity & volume | 27.5% | 24h volume, liquidity, spread/tradeability |
+| Momentum | 17.5% | 1h/24h/7d price movement |
+| Market attention | 12.5% | Trending rank |
 
-### Tradable Volatility: 40%
+### Tradable Volatility: 42.5%
 
 Build the volatility signal primarily from:
 
@@ -293,15 +262,6 @@ For example:
 If a coin is not trending, assign an appropriate neutral/zero signal based on
 the available data.
 
-### Catalysts & Event Potential: 10%
-
-Evaluate catalyst strength and relevance to near-term price movement.
-
-Positive catalysts should increase the score.
-
-Negative catalysts should primarily affect the risk tier unless they make the
-asset unsafe or effectively untradeable.
-
 ---
 
 ## Large Price Moves
@@ -331,9 +291,9 @@ Do not assume that every unexplained large move is a pump-and-dump.
 
 ---
 
-## Negative Catalysts
+## Risk Signals
 
-Negative news is not automatically disqualifying.
+Bearish news is not automatically disqualifying.
 
 Do NOT automatically exclude coins because of:
 
@@ -388,11 +348,7 @@ Do NOT exclude a coin solely because:
 - 24h gain > +50%
 - It has high volatility
 - It has a large recent price movement
-- It has a bearish news catalyst
 - It has a lawsuit or regulatory issue
-- It has an identifiable or unidentifiable catalyst
-
----
 
 ## Previous Scout Cycles
 
@@ -400,7 +356,7 @@ If a coin was already analyzed in the previous scout cycle:
 
 - Do not automatically exclude it.
 - Retain it if it continues to have strong volatility, liquidity, momentum,
-  attention, or catalyst signals.
+  or attention signals.
 - Prefer new candidates when they provide materially stronger trading
   characteristics.
 - Repeated appearance is acceptable when the underlying opportunity remains
@@ -558,8 +514,7 @@ Each opportunity must contain exactly:
   * `volume_$25M_24h`
   * `trending_rank_2`
   * `momentum_+18.4%_24h`
-  * `catalyst:exchange_listing`
-  * `new_listing`
+  * `exchange_listed_usdt`
 
 `risk_tier`:
 
@@ -628,6 +583,6 @@ One important improvement here is that the **task and skill now have the same me
 
 The scoring is now:
 
-**40% volatility → 25% liquidity → 15% momentum → 10% attention → 10% catalysts**
+**42.5% volatility → 27.5% liquidity → 17.5% momentum → 12.5% attention**
 
 That should make the agent much more likely to surface something like a coin with **8% ATR + $30M volume + 5% daily gain** instead of blindly preferring a coin that simply pumped 35% in 24 hours.

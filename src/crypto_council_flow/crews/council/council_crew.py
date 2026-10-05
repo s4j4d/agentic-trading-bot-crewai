@@ -61,7 +61,6 @@ from crypto_council_flow.tools.scout_tools import (
     MomentumScreenerTool,
     NewListingsTool,
     TrendingCoinsTool,
-    UpcomingCatalystsTool,
     VolatilityScreenerTool,
 )
 from crypto_council_flow.tools.exchange_base import (

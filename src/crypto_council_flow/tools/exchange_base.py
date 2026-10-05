@@ -303,9 +303,10 @@ class ExchangeBatchTickerTool(BaseTool):
     name: str = "exchange_batch_ticker"
     description: str = (
         "Fetches 24h tickers for a list of symbols in one shot (concurrently). "
-        "Preferred over repeated exchange_ticker calls when checking several "
-        "candidates. Symbols not traded on the configured exchange are "
-        "reported as errors — treat them as ineligible."
+        "This is the ONLY ticker tool — use it for one symbol or many "
+        "(pass a 1-element array for a single coin). Symbols not traded on "
+        "the configured exchange are reported as errors — treat them as "
+        "ineligible."
     )
     args_schema: Type[BaseModel] = ExchangeBatchTickerInput
 
