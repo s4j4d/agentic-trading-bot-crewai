@@ -929,10 +929,15 @@ def _update_paper_ledger(
         if abs(delta_qty) * px < 1e-9:
             continue
         side = "buy" if delta_qty > 0 else "sell"
-        amount = delta_qty * px
+        # Ledger rows record a positive traded size/amount on both sides and
+        # `side` carries the direction. Selling used to store a negative qty
+        # and amount, which made a profitable partial sell realize the wrong
+        # sign of P&L downstream.
+        traded_qty = abs(delta_qty)
         trade = {
             "ts": now_iso, "cycle": cycle, "coin_id": coin_id,
-            "side": side, "qty": delta_qty, "price": px, "amount": amount,
+            "side": side, "qty": traded_qty, "price": px,
+            "amount": traded_qty * px,
         }
         if side == "buy":
             new_qty = qty_now + delta_qty
@@ -942,7 +947,7 @@ def _update_paper_ledger(
             )
             pos["qty"] = new_qty
         else:
-            trade["realized_pnl"] = delta_qty * (px - pos["avg_cost"])
+            trade["realized_pnl"] = traded_qty * (px - pos["avg_cost"])
             realized += trade["realized_pnl"]
             pos["qty"] = qty_now + delta_qty
             if pos["qty"] <= 1e-9:
@@ -973,7 +978,12 @@ def _update_paper_ledger(
         t.get("realized_pnl") or 0.0 for t in ledger if t.get("realized_pnl") is not None
     )
     invested = sum(p["market_value"] for p in open_positions)
-    equity = account_size - invested + total_realized + unrealized
+    # Equity = cash + market value + P&L, and cash is (account_size - invested),
+    # so `invested` cancels: equity = account_size + realized + unrealized.
+    # Subtracting `invested` here (the old formula) double-counted the money
+    # sitting in open positions and understated equity by exactly `invested`
+    # the moment any capital was deployed.
+    equity = account_size + total_realized + unrealized
     return {
         "realized_pnl": total_realized,
         "unrealized_pnl": unrealized,
