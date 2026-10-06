@@ -61,6 +61,19 @@ def _load_snapshot() -> dict:
         return {}
 
 
+def _first_account_size() -> float | None:
+    """Account size of the EARLIEST logged cycle.
+
+    The chart plots only the last 60 history rows, so hist[0] silently
+    re-bases once the bot has run longer than that. The dashed 'start'
+    baseline must stay anchored to the true first cycle.
+    """
+    row = _load_history(limit=10 ** 9)
+    if not row:
+        return None
+    return row[0].get("account_size")
+
+
 def _load_history(limit: int = 60) -> list[dict]:
     rows: list[dict] = []
     if not HISTORY.exists():
@@ -95,10 +108,14 @@ def _axis_chart(
     width = 660
     ml, mr, mt, mb = 74, 14, 14, 44          # margins: y labels, right, top, x labels
     iw, ih = width - ml - mr, height - mt - mb
-    labels = labels or [str(i + 1) for i in range(len(values))]
+    # Tolerate a short/None label list rather than IndexError-ing on it.
+    if not labels or len(labels) < len(values):
+        labels = list(labels or []) + [str(i + 1) for i in range(len(labels or []), len(values))]
 
     pool = list(values) + ([baseline] if baseline is not None else [])
     lo, hi = min(pool), max(pool)
+    flat = lo == hi          # nothing moved: ticks would all round to the same string
+    flat_value = lo          # remember it before padding shifts lo/hi
     if hi == lo:
         hi, lo = hi + max(abs(hi) * 0.01, 1.0), lo - max(abs(lo) * 0.01, 1.0)
     pad = (hi - lo) * 0.10
@@ -124,7 +141,8 @@ def _axis_chart(
         f'aria-label="{_esc(y_title or "value")} by {_esc(x_title)}">'
     ]
     # horizontal gridlines + y tick labels
-    for k in range(5):
+    tick_idx = [2] if flat else [0, 1, 2, 3, 4]
+    for k in tick_idx:
         v = lo + span * k / 4
         y = yy(v)
         out.append(
@@ -132,6 +150,11 @@ def _axis_chart(
             f'class="grid"/>'
             f'<text x="{ml - 8}" y="{y + 4:.1f}" class="tick" text-anchor="end">'
             f"{_esc(_compact(v))}</text>"
+        )
+    if flat:
+        out.append(
+            f'<text x="{ml + iw / 2:.1f}" y="{mt + 14:.1f}" class="tick" '
+            f'text-anchor="middle">unchanged at {_esc(_compact(flat_value))}</text>'
         )
     # y axis title (rotated)
     if y_title:
@@ -211,6 +234,22 @@ def _action_class(action: str) -> str:
     }.get(action, "hold")
 
 
+def _row_worth(row: dict) -> float:
+    """Total portfolio worth for one history row.
+
+    Rows predating the paper ledger have no equity key; fall back to the
+    account size. Shared by the chart and the table so the two can never
+    disagree, and a genuine equity of 0 is never mistaken for "missing".
+    """
+    eq = row.get("equity")
+    if eq is None:
+        return float(row.get("account_size", 0) or 0)
+    try:
+        return float(eq)
+    except (TypeError, ValueError):
+        return float(row.get("account_size", 0) or 0)
+
+
 def build() -> str:
     snap = _load_snapshot()
     hist = _load_history()
@@ -248,7 +287,8 @@ def build() -> str:
     expos_pct_of_cap = min(100.0, exposure / max_total * 100) if max_total else 0
     plan_dur = _fmt_dur(snap.get("duration_s"))
     pnl_data = snap.get("pnl") or {}
-    portfolio_worth = float(pnl_data.get("equity", account) or account)
+    raw_equity = pnl_data.get("equity")
+    portfolio_worth = account if raw_equity is None else float(raw_equity)
 
     # --- KPI cards ---
     kpis = (
@@ -343,16 +383,15 @@ def build() -> str:
 # --- history: total portfolio worth over cycles ---
     hist_block = "<div class='card'><h2>Portfolio value over time</h2>"
     if len(hist) >= 2:
-        equity_series = []
-        labels = []
-        for h in hist:
-            eq = h.get("equity")
-            if eq is None:
-                # pre-ledger cycles: fall back to account + unrealized-free estimate
-                eq = float(h.get("account_size", 0) or 0) - float(h.get("cash_remaining", 0) or 0) + float(h.get("cash_remaining", 0) or 0)
-            equity_series.append(float(eq or 0))
-            labels.append("#%s %s" % (h.get("cycle", "?"), str(h.get("ts", ""))[5:16]))
-        start_val = float(hist[0].get("account_size", 0) or 0) or None
+        equity_series = [_row_worth(h) for h in hist]
+        labels = [
+            "#%s %s" % (h.get("cycle", "?"), str(h.get("ts", ""))[5:16])
+            for h in hist
+        ]
+        # _load_history windows to the last 60 rows, so hist[0] is NOT the true
+        # first cycle once the bot has run longer than that — re-read the
+        # earliest logged row for the baseline instead of re-basing silently.
+        start_val = float(_first_account_size() or 0) or None
         chart = _axis_chart(
             equity_series,
             labels,
@@ -377,7 +416,7 @@ def build() -> str:
             "<th>Exposure</th><th>Cash</th><th>Positions</th><th>Took</th><th>Total P&L</th></tr></thead><tbody>"
         )
         for h in reversed(hist[-12:]):
-            eq_val = float(h.get("equity", 0) or 0)
+            eq_val = _row_worth(h)
             hist_block += (
                 "<tr><td>#%s</td><td><small>%s</small></td><td class='num'>%s</td>"
                 "<td class='num'>%s</td>"

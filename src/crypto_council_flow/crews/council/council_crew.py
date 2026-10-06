@@ -108,7 +108,18 @@ memory = Memory(
 # Task 6: gate CrewAI memory behind env var (default off — generic
 # conversation memory adds Ollama embed latency on every agent step with
 # no trading value; real-trading memory is Task 9 trade journal).
-_USE_MEMORY = os.getenv("USE_MEMORY", "false").lower() == "true"
+# COUNCIL_MEMORY is canonical; USE_MEMORY is accepted as an alias so an
+# existing deployment setting keeps working after the rename. The explicit
+# false under COUNCIL_MEMORY wins, so turning memory off can't be undone
+# by a stale alias left over from before the rename.
+def _memory_flag() -> bool:
+    canonical = os.getenv("COUNCIL_MEMORY")
+    if canonical is not None and canonical.strip() != "":
+        return canonical.strip().lower() == "true"
+    return (os.getenv("USE_MEMORY") or "false").strip().lower() == "true"
+
+
+_USE_MEMORY = _memory_flag()
 
 _CONFIG_DIR = Path(__file__).parent / "config"
 _SKILLS_DIR = Path(__file__).parent / "skills"

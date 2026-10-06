@@ -12,10 +12,12 @@ simulated on paper; live order execution is planned for the future.
 
 Three-step `CryptoCouncilFlow` (`src/crypto_council_flow/main.py`):
 
-1. **`run_scout`** (every 2h) — `CouncilScoutCrew` (single `market_scout` agent)
+1. **`run_scout`** (every 2h by default — `COUNCIL_SCOUT_INTERVAL_S`) —
+   `CouncilScoutCrew` (single `market_scout` agent)
    scans CoinGecko screeners + exchange data and emits a ranked shortlist of
    3 `CoinOpportunity` records (score 0–100, risk tier, one-sentence reason).
-2. **`analyse_coins`** (every 5m, over the current scout list) — for each coin,
+2. **`analyse_coins`** (every 5m by default — `COUNCIL_ANALYSIS_INTERVAL_S`, over
+   the current scout list) — for each coin,
    `CouncilAnalysisCrew` runs a sequential pipeline:
    `technical_analyst` → `sentiment_analyst` → `risk_manager`.
    Coins are processed **in parallel** via `ThreadPoolExecutor`
@@ -41,11 +43,16 @@ The council is configured for short-horizon trading, not swing trades:
   deterministic ceiling on how long a position may be held, and is mirrored
   into every crew kickoff (`max_hold_days`) plus all task prompts and
   `SKILL.md` files so the LLM reasons about the same intraday horizon.
-- **`risk_tick` runs every 60s** (`RISK_TICK_INTERVAL_SECONDS`) with **no LLM
+- **`risk_tick` runs every 60s** (`COUNCIL_RISK_TICK_INTERVAL_S`) with **no LLM
   call**: it force-closes on stop-loss / take-profit hits, closes positions
   past `max_hold_days`, and appends a paper P&L row to
   `output/portfolio_history.jsonl`.
 - Cadence: scout 2h → analysis 5m → risk tick 60s, all gated by the cycle lock.
+  The scheduler **wakes every 60 s** but each crew only fires when its *own*
+  env-set interval has elapsed, so the wake-up rate is not the crew rate —
+  the per-tick log line now prints when each step is actually next due.
+  Cadence values accept bare seconds (`7200`) or a suffix (`30m`, `2h`, `1d`)
+  and are read from `.env` (loaded by CrewAI's `load_dotenv()`).
 
 ### Scout tool-call discipline
 
@@ -90,7 +97,12 @@ pip install uv
 crewai install          # or: pip install -e .
 ```
 
-Configure the LLM backend in `.env` (keys only — values are yours):
+Configure the LLM backend in `.env` — start from `.env.example`, which lists
+every knob the code reads with its default and blanks only the secrets:
+
+```bash
+cp .env.example .env    # then fill in the KEY values
+```
 
 ```bash
 OPENAI_API_KEY=...
@@ -138,18 +150,27 @@ Console prints per-cycle timings (`⏱ Scout/Analysis/Portfolio`) and a
 
 | Knob | Where | Default |
 |---|---|---|
-| Scout / analysis cadence | `main.py` `SCOUT_INTERVAL_SECONDS` / `ANALYSIS_INTERVAL_SECONDS` | 2h / 5m |
-| Deterministic risk tick | `main.py` `RISK_TICK_INTERVAL_SECONDS` | 60s |
+| Scout cadence | `COUNCIL_SCOUT_INTERVAL_S` env (`main.py` `SCOUT_INTERVAL_SECONDS`) | 2h |
+| Analysis + portfolio cadence | `COUNCIL_ANALYSIS_INTERVAL_S` env (`main.py` `ANALYSIS_INTERVAL_SECONDS`) | 5m |
+| Deterministic risk tick | `COUNCIL_RISK_TICK_INTERVAL_S` env (`main.py` `RISK_TICK_INTERVAL_SECONDS`) | 60s |
 | Max hold (days) | `--max-hold-days` / `COUNCIL_MAX_HOLD_DAYS` env | 1 |
 | RSI / ATR look-back (candles) | `--rsi-period` / `--atr-period`, or `COUNCIL_RSI_PERIOD` / `COUNCIL_ATR_PERIOD` env | 14 / 14 |
 | Candle timeframe | `exchange_ohlc` `timeframe` (technical analysis) | `1h` |
 | Analysis parallelism | `COUNCIL_ANALYSIS_WORKERS` env | 3 |
+| Crew-vs-ATR SL/TP tolerance (%) | `COUNCIL_RISK_LEVEL_TOLERANCE_PCT` env | 20 |
 | Tool HTTP timeouts | `_DEFAULT_TIMEOUT` per tool module | 10s |
 | OHLC cache / throttle | `tools/technical_indicators.py`, `COUNCIL_OHLC_TTL_S` env | 5-min TTL, 6s min gap |
+| OHLC source | `USE_EXCHANGE_OHLC` env (`true` = exchange, `false` = CoinGecko) | `false` |
+| Sentiment news feeds | `CRYPTO_NEWS_SENTIMENT` env (comma-separated RSS URLs) | CoinTelegraph / CoinDesk / Decrypt |
+| NewsData provider key | `NEWSDATA_API_KEY` env | unset |
 | Exposure caps | `--max-total-exposure` / `--max-single-position` | 60% / 20% |
-| Exchange backend | `EXCHANGE*` env (`EXCHANGE_API_BASE`, `EXCHANGE_QUOTE`) | Nobitex apiv2, usdt quote |
-| CrewAI generic memory | `USE_MEMORY` env | `false` (off; trade journal is separate) |
+| Exchange backend | `EXCHANGE*` env (`EXCHANGE`, `EXCHANGE_API_BASE`, `EXCHANGE_API_KEY`, `EXCHANGE_QUOTE`) | Nobitex apiv2, `rls` quote |
+| CrewAI generic memory | `COUNCIL_MEMORY` env (`USE_MEMORY` legacy alias) | `false` (off; trade journal is separate) |
 | Volatility screener exchange filter | `require_exchange_listing` on `VolatilityScreenerTool` | `true` |
+
+Every knob above is listed with its value in `.env`. Shell environment
+variables take precedence over `.env`, so a one-off run can override any of
+them without editing the file.
 
 ## Tests
 

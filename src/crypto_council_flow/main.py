@@ -37,8 +37,10 @@ from __future__ import annotations
 
 import asyncio
 import json
-import sys
+import math
 import os
+import re
+import sys
 import time
 os.environ["OTEL_SDK_DISABLED"] = "true"
 from concurrent.futures import ThreadPoolExecutor
@@ -63,9 +65,39 @@ from crypto_council_flow.tools.technical_indicators import _fetch_ohlcv
 # Constants
 # ---------------------------------------------------------------------------
 
-SCOUT_INTERVAL_SECONDS: int = 2 * 60 * 60   # 2 hours
-ANALYSIS_INTERVAL_SECONDS: int = 5 * 60     # 5 minutes
-RISK_TICK_INTERVAL_SECONDS: int = 60        # deterministic SL/TP + max-hold, no LLM
+
+def _env_seconds(name: str, default: int) -> int:
+    """Read a cadence env var as seconds.
+
+    Accepts bare seconds (``7200``) or a duration suffix (``30m``, ``2h``,
+    ``1.5h``, ``1d``). Blank, junk and non-finite values fall back to
+    ``default`` so one bad ``.env`` line can never crash or wild-speed the
+    scheduler. Negative/zero clamps to 1s — the scheduler's own tick is 60s,
+    so anything below that is meaningless anyway.
+    """
+    raw = (os.getenv(name) or "").strip()
+    if not raw:
+        return default
+    match = re.fullmatch(r"([+-]?\d+(?:\.\d+)?)\s*([smhd]?)", raw, re.IGNORECASE)
+    if not match:
+        return default
+    scale = {"": 1, "s": 1, "m": 60, "h": 3600, "d": 86400}[match.group(2).lower()]
+    try:
+        value = float(match.group(1)) * scale
+    except ValueError:
+        return default
+    if not math.isfinite(value):
+        return default
+    return max(1, int(value))
+
+
+SCOUT_INTERVAL_SECONDS: int = _env_seconds("COUNCIL_SCOUT_INTERVAL_S", 2 * 60 * 60)
+ANALYSIS_INTERVAL_SECONDS: int = _env_seconds("COUNCIL_ANALYSIS_INTERVAL_S", 5 * 60)
+RISK_TICK_INTERVAL_SECONDS: int = _env_seconds("COUNCIL_RISK_TICK_INTERVAL_S", 60)
+# Wake-up granularity of the outer loop. Deliberately NOT env-tunable: every
+# step above gates on its own interval, so this only bounds how long a due
+# cycle can sit idle between scheduler passes.
+SCHEDULER_TICK_SECONDS: int = 60
 DEFAULT_VS_CURRENCY: str = "usd"
 DEFAULT_BASE_CURRENCY: str = "usd"
 DEFAULT_RSI_PERIOD: int = int(os.getenv("COUNCIL_RSI_PERIOD", "14"))
@@ -236,6 +268,34 @@ def _fmt_dur(seconds: float) -> str:
     h, rem = divmod(int(seconds), 3600)
     m = rem // 60
     return f"{h}h {m:02d}m"
+
+
+def _fmt_next_runs(
+    now: float,
+    *,
+    last_scout: float,
+    last_analysis: float,
+    last_risk_tick: float,
+) -> str:
+    """Per-step 'due in X' summary for the scheduler tick log.
+
+    The scheduler wakes every SCHEDULER_TICK_SECONDS regardless of the
+    per-crew intervals, so the wake-up rate is not the crew rate. This
+    prints when each step actually next fires so the log isn't read as a
+    stall.
+    """
+    steps = (
+        ("scout", last_scout, SCOUT_INTERVAL_SECONDS),
+        ("analysis", last_analysis, ANALYSIS_INTERVAL_SECONDS),
+        ("risk tick", last_risk_tick, RISK_TICK_INTERVAL_SECONDS),
+    )
+    parts = []
+    for label, last, interval in steps:
+        remaining = interval - (now - last)
+        parts.append(
+            f"{label} due now" if remaining <= 0 else f"{label} in {_fmt_dur(remaining)}"
+        )
+    return " | ".join(parts)
 
 
 # ---------------------------------------------------------------------------
@@ -1439,15 +1499,25 @@ async def _run_async(
             print("Ran one full cycle (--once flag). Exiting.")
             break
 
-        # Sleep for 60 s between scheduler ticks (granularity: 1 min)
+        # Sleep for SCHEDULER_TICK_SECONDS between scheduler ticks. This is
+        # the wake-up granularity only — each crew still gates on its own
+        # env-set interval, so the tick rate is not the crew rate.
+        # Re-read the clock here: the last_*_time stamps above were taken
+        # AFTER each crew ran, so the loop-top `now` predates them and would
+        # overstate every remaining time by the duration of the work just done.
         print(
             f"\n[Scheduler] Cycle {iteration} done "
             f"(scout {_fmt_dur(flow.state.last_scout_duration_s)} | "
             f"analysis {_fmt_dur(flow.state.last_analysis_duration_s)} | "
             f"portfolio {_fmt_dur(flow.state.last_portfolio_duration_s)}). "
-            f"Next analysis check in ~60 s."
+            + _fmt_next_runs(
+                time.time(),
+                last_scout=last_scout_time,
+                last_analysis=last_analysis_time,
+                last_risk_tick=last_risk_tick_time,
+            )
         )
-        await asyncio.sleep(60)
+        await asyncio.sleep(SCHEDULER_TICK_SECONDS)
 
 
 # ---------------------------------------------------------------------------

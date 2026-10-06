@@ -95,9 +95,14 @@ class TestBackfillRiskLevels:
         assert (by_coin["bitcoin"]["stop_loss"], by_coin["bitcoin"]["take_profit"]) == (199.0, 202.0)
         assert by_coin["bitcoin"]["target"] == 0.0
 
-    def test_keeps_crew_levels_within_20pct(self):
+    def test_keeps_crew_levels_within_20pct(self, monkeypatch):
         from crypto_council_flow.main import _backfill_risk_levels
 
+        # Pin the tolerance this test is about: the code reads
+        # COUNCIL_RISK_LEVEL_TOLERANCE_PCT from the operator's live .env, so an
+        # unpatched run silently retargets itself at whatever tolerance the
+        # local config happens to carry.
+        monkeypatch.setenv("COUNCIL_RISK_LEVEL_TOLERANCE_PCT", "20")
         # atr 2.5% -> computed stop 98.75, take 102.5; crew values inside 20%
         plan = {"actions": [
             {"coin_id": "solana", "symbol": "SOL", "action": "open",
@@ -123,8 +128,12 @@ class TestBackfillRiskLevels:
         a = out["actions"][0]
         assert (a["stop_loss"], a["take_profit"]) == (98.75, 102.5)
 
-    def test_rejects_far_from_computed_and_replaces(self):
+    def test_rejects_far_from_computed_and_replaces(self, monkeypatch):
         from crypto_council_flow.main import _backfill_risk_levels
+
+        # Pin the tolerance: at 30% these crew values are inside the window and
+        # would be kept, so this test only means what it says at 20%.
+        monkeypatch.setenv("COUNCIL_RISK_LEVEL_TOLERANCE_PCT", "20")
 
         # sane side but far beyond 20% tolerance -> computed wins
         plan = {"actions": [
