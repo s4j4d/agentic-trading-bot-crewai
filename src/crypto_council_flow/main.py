@@ -894,9 +894,17 @@ def _update_paper_ledger(
     for coin_id in list(positions.keys()):
         target = plan_targets.get(coin_id, 0.0)
         if target <= 0:
-            pos = positions.pop(coin_id)
+            pos = positions[coin_id]
             px = (risk_snapshot.get(coin_id) or {}).get("current_price")
-            if px and pos.get("qty"):
+            if not px:
+                # No price this cycle (429 / thin data). Realizing at cost is
+                # wrong, but DROPPING the position destroys cost basis and its
+                # P&L permanently -- the book silently shrinks and equity
+                # freezes. Keep the position so the next priced cycle closes
+                # it properly; only a real target > 0 can revive it.
+                continue
+            positions.pop(coin_id, None)
+            if pos.get("qty"):
                 proceeds = pos["qty"] * px
                 cost = pos["qty"] * pos["avg_cost"]
                 realized += proceeds - cost
@@ -906,11 +914,12 @@ def _update_paper_ledger(
                     "amount": proceeds, "realized_pnl": proceeds - cost,
                 })
             else:
+                positions.pop(coin_id, None)
                 trades.append({
                     "ts": now_iso, "cycle": cycle, "coin_id": coin_id,
                     "side": "close", "qty": pos.get("qty", 0),
                     "price": px, "amount": 0.0, "realized_pnl": None,
-                    "note": "no price available — position dropped without P&L",
+                    "note": "zero-quantity position closed",
                 })
 
     # Apply plan deltas at current price.
@@ -923,6 +932,11 @@ def _update_paper_ledger(
         if not px:
             continue
         qty_target = target / px
+        # A plan action that targets 0 is a close, handled in the close pass
+        # above; setdefault here would resurrect a phantom {qty: 0} position
+        # that then leaks into every future cycle's book.
+        if target <= 0:
+            continue
         pos = positions.setdefault(coin_id, {"qty": 0.0, "avg_cost": 0.0})
         qty_now = pos["qty"]
         delta_qty = qty_target - qty_now

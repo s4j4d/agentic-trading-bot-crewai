@@ -30,7 +30,14 @@ _DEFAULT_TIMEOUT = 10  # seconds
 # Shared helpers
 # ---------------------------------------------------------------------------
 
-_MIN_CANDLES = 50  # minimum candles we want for indicators to work reliably
+# Minimum candles an indicator run needs. Deliberately NOT 50: CoinGecko's
+# /ohlc returns 4h bars for days=7..30 (42-180 bars) but only ~23-45 for
+# days=90/180 and ~92 for days=365, so a threshold of 50 rejected every rung
+# of the escalation ladder except the widest window. Callers asking for a
+# few days of data paid four throttled requests (days 7/90/180/365) for data
+# days=14 returns in two, and any 429 along the way killed the whole chain.
+# Wilder ATR needs period+1 bars; the tools that need more ask for more days.
+_MIN_CANDLES = int(os.getenv("COUNCIL_MIN_CANDLES", "24"))
 _USE_EXCHANGE = os.getenv("USE_EXCHANGE_OHLC", "false").lower() == "true"
 
 # In-memory OHLC cache: one fetch per (coin, vs, days) shared by all
@@ -75,10 +82,25 @@ def _fetch_ohlcv(coin_id: str, vs_currency: str, days: int) -> list[list[float]]
     return data
 
 
+def _valid_coingecko_days(days: int) -> int:
+    """Round a requested day-count up to the nearest CoinGecko-accepted value.
+
+    The free-tier /ohlc endpoint accepts only {1, 7, 14, 30, 90, 180, 365}
+    and rejects any other count with a 400 ("Invalid days parameter").
+    Callers historically asked for days=3, which kills _fetch_ohlcv_coingecko
+    on the first attempt (raise_for_status -> Exception) and therefore
+    silently empties the P&L ledger that depends on the ATR snapshot.
+    """
+    for d in (1, 7, 14, 30, 90, 180, 365):
+        if days <= d:
+            return d
+    return 365
+
+
 def _fetch_ohlcv_coingecko(coin_id: str, vs_currency: str, days: int) -> list[list[float]]:
     """Fetch OHLCV from CoinGecko."""
     ohlc_url = f"{_COINGECKO_BASE}/coins/{coin_id}/ohlc"
-    escalation = [days, 90, 180, 365, 730]
+    escalation = sorted({_valid_coingecko_days(d) for d in (days, 90, 180, 365)})
 
     for attempt_days in escalation:
         params = {"vs_currency": vs_currency, "days": attempt_days}
