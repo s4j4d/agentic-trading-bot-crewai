@@ -34,6 +34,7 @@ ROOT = Path(__file__).resolve().parent.parent
 OUT_DIR = ROOT / "output"
 SNAPSHOT = OUT_DIR / "portfolio_plan.json"
 HISTORY = OUT_DIR / "portfolio_history.jsonl"
+LEDGER = OUT_DIR / "paper_ledger.json"
 PANEL = OUT_DIR / "portfolio_panel.html"
 
 HISTORY_WINDOW = 60          # cycles plotted/listed on the page
@@ -226,6 +227,61 @@ def _row_worth(row: dict) -> float:
     if eq is None:
         return _num(row.get("account_size"))
     return _num(eq, _num(row.get("account_size")))
+
+
+def _load_ledger() -> list[dict]:
+    """Raw paper-ledger rows (one dict per fill). Corrupt/missing -> []."""
+    if not LEDGER.exists():
+        return []
+    try:
+        raw = json.loads(LEDGER.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+    if not isinstance(raw, list):
+        return []
+    return [r for r in raw if isinstance(r, dict)]
+
+
+def _fills_for_cycle(rows: list[dict], cycle: object) -> dict[str, dict]:
+    """Net computed fill of one cycle, keyed by coin_id.
+
+    The ledger is the only place a target notional turns into an actual
+    quantity and traded amount: qty = target / price. The panel used to show
+    just the plan's notional targets, so the number the system really
+    computed was invisible.
+
+    A coin can be filled more than once in one cycle (opened then rebalanced,
+    or two actions for the same coin), so buys and sells are NETTED rather
+    than summed: gross flow would report 25 bought + 13.6 sold as 38.6 coins
+    and 4,000 deployed, which is neither the position nor the trade. Net qty
+    is the change in coins held, net amount the change in capital deployed.
+    """
+    want = _int(cycle, None)
+    by_coin: dict[str, dict] = {}
+    for r in rows:
+        if want is not None and _int(r.get("cycle"), None) != want:
+            continue
+        coin = str(r.get("coin_id") or "")
+        if not coin:
+            continue
+        side = str(r.get("side") or "")
+        qty = abs(_num(r.get("qty")))
+        amount = abs(_num(r.get("amount")))
+        sign = -1.0 if side in ("sell", "close") else 1.0
+        realized = r.get("realized_pnl")
+        cur = by_coin.setdefault(coin, {
+            "qty": 0.0, "amount": 0.0, "realized_pnl": 0.0,
+            "priced": True, "n_fills": 0,
+        })
+        cur["qty"] += sign * qty
+        cur["amount"] += sign * amount
+        cur["n_fills"] += 1
+        if realized is not None:
+            cur["realized_pnl"] += _num(realized)
+        if not qty and not amount:
+            # a fill with no price available was recorded as a zero-size note
+            cur["priced"] = False
+    return by_coin
 
 
 # ---------------------------------------------------------------------------
@@ -486,13 +542,32 @@ def _allocation(actions: list[dict], cash: float) -> str:
     )
 
 
-def _positions(actions: list[dict], score_by_coin: dict, account: float, cur: str) -> str:
+def _positions(
+    actions: list[dict],
+    score_by_coin: dict,
+    account: float,
+    cur: str,
+    fills: dict[str, dict] | None = None,
+) -> str:
+    fills = fills or {}
     rows = []
     for a in sorted(actions, key=lambda x: _num(x.get("target")), reverse=True):
+        coin = str(a.get("coin_id", ""))
         tgt = _num(a.get("target"))
         now_amt = _num(a.get("current"))
         delta = tgt - now_amt
         weight = (tgt / account * 100) if account else 0.0
+        f = fills.get(coin)
+        if f:
+            # net computed fill: change in coins held, change in capital
+            done = f"{f['qty']:+,.6g}"
+            filled = (
+                f"<b class='{_pnl_class(f['amount'])}'>{f['amount']:+,.0f}</b>"
+                if f["priced"] else "<b class='muted'>—</b>"
+            )
+        else:
+            # no fill row: target already matched, or no price this cycle
+            done = filled = "<span class='muted'>—</span>"
         rows.append(
             "<tr>"
             f"<td><b>{_esc(a.get('symbol') or a.get('coin_id') or '?')}</b>"
@@ -503,23 +578,26 @@ def _positions(actions: list[dict], score_by_coin: dict, account: float, cur: st
             f"<td class='num'>{tgt:,.0f}</td>"
             f"<td class='num {_pnl_class(delta) if delta else ''}'>"
             f"{f'{delta:+,.0f}' if delta else '—'}</td>"
+            f"<td class='num'>{done}</td>"
+            f"<td class='num'>{filled}</td>"
             f"<td class='num'>{weight:.1f}%</td>"
             f"<td class='num'>{_lvl(a.get('stop_loss'))}</td>"
             f"<td class='num'>{_lvl(a.get('take_profit'))}</td>"
             f"<td>{_esc(a.get('sl_tp_source') or '—')}</td>"
-            f"<td class='num'>{_esc(score_by_coin.get(a.get('coin_id', ''), '—'))}</td>"
+            f"<td class='num'>{_esc(score_by_coin.get(coin, '—'))}</td>"
             f"<td class='reason'>{_esc(a.get('reason', ''))}</td>"
             "</tr>"
         )
     table = (
         "<div class='scroll'><table><thead><tr><th>Coin</th><th>Action</th>"
         "<th>Current</th><th>Target</th><th>Delta</th>"
+        "<th>Filled<br>qty</th><th>Filled<br>amt</th>"
         "<th>Acct<br>%</th>"
         "<th>Stop</th><th>Take</th>"
         "<th>SL/TP<br>src</th>"
         "<th>Score</th><th>Why</th>"
         "</tr></thead><tbody>"
-        + ("".join(rows) if rows else "<tr><td colspan='11'>No actions in plan.</td></tr>")
+        + ("".join(rows) if rows else "<tr><td colspan='13'>No actions in plan.</td></tr>")
         + "</tbody></table></div>"
     )
     return (
@@ -527,11 +605,74 @@ def _positions(actions: list[dict], score_by_coin: dict, account: float, cur: st
         + table
         + f"<p class='muted'>Amounts in {cur}. <b>Delta</b> is the rebalance flow "
         "(target − current), not profit — a positive delta is capital to deploy, "
-        "not a gain. <b>Stop</b>/<b>Take</b> are 0.5x-ATR / 1x-ATR price levels in "
-        "the quote currency, informational: no orders are placed. "
-        "<b>SL/TP src</b>: explicit = crew-supplied level within 20% of ATR kept, "
-        "computed = deterministic ATR used, none = unavailable (e.g. rate-limited). "
-        "<b>Score</b> is the scout/analyst score for that coin.</p></div>"
+        "not a gain. <b>Filled qty</b>/<b>Filled amt</b> are the net figures the "
+        "paper ledger computed and booked this cycle at the cached close price: "
+        "positive deploys capital, negative returns it. '—' means the target already "
+        f"matched the held position or no price was available ({len(fills)} coin(s) "
+        "filled). <b>Stop</b>/<b>Take</b> are 0.5x-ATR / "
+        "1x-ATR price levels in the quote currency, informational: no orders are "
+        "placed. <b>SL/TP src</b>: explicit = crew-supplied level within 20% of ATR "
+        "kept, computed = deterministic ATR used, none = unavailable (e.g. "
+        f"rate-limited). <b>Score</b> is the scout/analyst score for that coin. "
+        "</p></div>"
+    )
+
+
+def _fills_section(fills: dict[str, dict], rows: list[dict], cycle: object, cur: str,
+                   symbol_by_coin: dict) -> str:
+    """Computed fills of this cycle, one row per ledger entry.
+
+    This is the raw arithmetic the plan is executed with — qty = target / price
+    — kept separate from the plan table so a coin whose target already matched
+    its held position is visibly a no-op rather than a silent omission.
+    """
+    head = (
+        "<div class='card'><h2>Computed fills <small class='muted'>paper ledger, "
+        "this cycle</small></h2>"
+    )
+    if not rows:
+        return (
+            head
+            + "<p class='muted'>The paper ledger has no fills yet. It is written "
+            "at the end of the first portfolio cycle that trades — every fill, "
+            "its quantity, price and amount appear here.</p></div>"
+        )
+    out = []
+    for r in reversed(rows[-25:]):
+        coin = str(r.get("coin_id") or "?")
+        side = str(r.get("side") or "?")
+        realized = r.get("realized_pnl")
+        out.append(
+            "<tr>"
+            f"<td><b>{_esc(symbol_by_coin.get(coin, coin))}</b>"
+            f"<br><small>{_esc(coin)}</small></td>"
+            f"<td><span class='pill {_action_class('close' if side == 'close' else side)}'>"
+            f"{_esc(side)}</span></td>"
+            f"<td class='num'>{abs(_num(r.get('qty'))):,.6g}</td>"
+            f"<td class='num'>{_lvl(r.get('price'))}</td>"
+            f"<td class='num'><b>{abs(_num(r.get('amount'))):,.0f}</b></td>"
+            f"<td class='num {_pnl_class(realized) if realized is not None else ''}'>"
+            f"{'—' if realized is None else format(_num(realized), '+,.2f')}</td>"
+            f"<td><small>{_esc(r.get('note', ''))}</small></td>"
+            "</tr>"
+        )
+    # Count what the table actually shows, and say so when it is truncated —
+    # the table is capped at 25 rows for page length.
+    shown = len(out)
+    total_rows = len(rows)
+    caption = f"{shown} fill(s) on cycle #{_esc(cycle)}."
+    if total_rows > shown:
+        caption += f" Showing the last {shown} of {total_rows}."
+    return (
+        head
+        + "<div class='scroll'><table><thead><tr><th>Coin</th><th>Side</th>"
+        "<th>Qty</th><th>Price</th><th>Amount</th><th>Realized</th><th>Note</th>"
+        "</tr></thead><tbody>" + "".join(out) + "</tbody></table></div>"
+        + f"<p class='muted'>{caption} "
+        "<b>Qty</b> = target amount ÷ price, so it changes as price moves — the "
+        "target is a notional amount, not a coin count. <b>Realized</b> appears on "
+        "sells and closes only. Amounts in "
+        f"{cur}.</p></div>"
     )
 
 
@@ -715,12 +856,29 @@ def build() -> str:
     opps = snap.get("opportunities") or []
     score_by_coin = {o.get("coin_id", ""): o.get("score", "") for o in opps}
     pnl = snap.get("pnl") or {}
+    cycle = snap.get("portfolio_cycle")
+
+    # Computed fills: the ledger is the only place a target notional becomes a
+    # quantity and a traded amount, so read it directly rather than leaving the
+    # computed size invisible on the page.
+    ledger = _load_ledger()
+    cycle_fills = _fills_for_cycle(ledger, cycle)
+    cycle_rows = [
+        r for r in ledger
+        if cycle is None or _int(r.get("cycle"), None) == _int(cycle, None)
+    ]
+    symbol_by_coin = {str(a.get("coin_id", "")): a.get("symbol") or "" for a in actions}
+    for o in opps:
+        symbol_by_coin.setdefault(str(o.get("coin_id", "")), o.get("symbol") or "")
+    for pos in pnl.get("open_positions") or []:
+        symbol_by_coin.setdefault(str(pos.get("coin_id", "")), str(pos.get("coin_id", "")))
 
     body = (
         _strip(snap, now, cur)
         + _kpis(plan, snap, actions, pnl, cur)
         + _allocation(actions, _num(plan.get("cash_remaining")))
-        + _positions(actions, score_by_coin, _num(snap.get("account_size")), cur)
+        + _positions(actions, score_by_coin, _num(snap.get("account_size")), cur, cycle_fills)
+        + _fills_section(cycle_fills, cycle_rows, cycle, cur, symbol_by_coin)
         + _pnl_section(pnl, cur)
         + _history_section(hist, cur)
         + _signals(opps)
