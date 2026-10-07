@@ -137,7 +137,13 @@ python -m crypto_council_flow.main --once --max-total-exposure 60 --max-single-p
 - `<coin_id>_report.md` — per-coin full analysis (with `**Analysis time:**` header)
 - `all_analysis_results.txt` — consolidated per-cycle log
 - `portfolio_plan.json` — latest rebalance snapshot (actions, totals, `duration_s`)
-- `portfolio_history.jsonl` — one row per portfolio cycle (trend log)
+- `portfolio_history.jsonl` — one row per portfolio cycle (trend log), each
+  tagged `"source": "main"`. `risk_tick` also appends a row every 60 s to
+  `output/portfolio_history.jsonl` carrying the *current, unchanged* cycle
+  number; those are tagged `"source": "risk_tick"` and are progress notes
+  inside a cycle, **not** cycles. `scripts/portfolio_panel.py` counts only
+  main cycles (`NON_MAIN_SOURCES`), so the chart, the cycle count and the
+  `HISTORY_WINDOW` all measure real cycles.
 - `paper_ledger.json` — paper fills (entry price/qty) feeding the P&L section
 - `scripts/portfolio_panel.py` — stdlib-only HTML panel generator
   (`python scripts/portfolio_panel.py` → `output/portfolio_panel.html`;

@@ -684,6 +684,9 @@ class CryptoCouncilFlow(Flow[CryptoCouncilState]):
                 fh.write(json.dumps({
                     "ts": self.state.last_portfolio_utc,
                     "cycle": self.state.portfolio_cycle,
+                    # one row per real cycle; risk_tick rows are marked
+                    # source="risk_tick" and are NOT counted as cycles
+                    "source": "main",
                     "duration_s": round(self.state.last_portfolio_duration_s, 1),
                     "account_size": self.state.account_size,
                     "base_currency": self.state.base_currency,

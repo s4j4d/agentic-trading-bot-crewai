@@ -40,6 +40,14 @@ PANEL = OUT_DIR / "portfolio_panel.html"
 HISTORY_WINDOW = 60          # cycles plotted/listed on the page
 SIGNAL_SLICES = 10           # opportunities shown in the signal table
 
+# History rows written by steps that are NOT a cycle of their own. risk_tick()
+# runs every 60s with no LLM call to force-close positions between LLM cycles,
+# and logs a row per tick carrying the *current, unchanged* cycle number. Those
+# are progress notes inside a cycle, not cycles: counting them made one cycle
+# render as N points all labelled "#1". A row with no `source` key predates the
+# marker and is a main cycle, so old history files keep working.
+NON_MAIN_SOURCES = frozenset({"risk_tick"})
+
 
 # ---------------------------------------------------------------------------
 # small helpers
@@ -143,7 +151,8 @@ def _load_snapshot() -> tuple[dict, str | None]:
     return snap, None
 
 
-def _load_history(limit: int = HISTORY_WINDOW) -> list[dict]:
+def _read_history() -> list[dict]:
+    """Every parseable row in the history file, in log order."""
     rows: list[dict] = []
     if not HISTORY.exists():
         return rows
@@ -160,7 +169,39 @@ def _load_history(limit: int = HISTORY_WINDOW) -> list[dict]:
                 rows.append(row)
     except OSError:
         return []
-    return rows[-limit:]
+    return rows
+
+
+def _main_cycles(rows: list[dict]) -> list[dict]:
+    """History rows that each represent one real cycle.
+
+    A cycle is the analysis + portfolio-manager pair, i.e. one
+    `manage_portfolio()` run. Rows logged by a non-cyclic step (see
+    NON_MAIN_SOURCES) share their cycle's number and are dropped here so they
+    cannot inflate the cycle count, the chart, or the window.
+    """
+    return [r for r in rows if str(r.get("source") or "main") not in NON_MAIN_SOURCES]
+
+
+def _load_history(limit: int | None = None) -> list[dict]:
+    """Main-cycle rows, most recent `limit` of them (default HISTORY_WINDOW).
+
+    `limit` is resolved at call time, not as a default argument, so changing
+    HISTORY_WINDOW actually takes effect.
+
+    Filtering happens BEFORE the window: the window is a count of cycles, so
+    applying it to raw lines would spend it on risk ticks and evict real
+    cycles from the chart as the bot runs.
+    """
+    if limit is None:
+        limit = HISTORY_WINDOW
+    return _main_cycles(_read_history())[-limit:]
+
+
+def _count_hidden_rows() -> int:
+    """How many non-main rows exist in the file (reported on the page)."""
+    rows = _read_history()
+    return len(rows) - len(_main_cycles(rows))
 
 
 def _first_account_size() -> float | None:
@@ -217,7 +258,7 @@ def _cycle_label(row: dict) -> str:
 
 
 def _row_worth(row: dict) -> float:
-    """Total portfolio worth for one history row.
+    """Account equity for one history row.
 
     Rows predating the paper ledger have no equity key; fall back to the
     account size. Shared by the chart and the table so the two can never
@@ -492,7 +533,7 @@ def _kpis(plan: dict, snap: dict, actions: list[dict], pnl: dict, cur: str) -> s
     cap_fill = min(100.0, exposure / max_total * 100)
     return (
         "<div class='kpis'>"
-        f"<div class='card kpi'><span>Portfolio worth</span><b>{_fmt(worth, cur)}</b></div>"
+        f"<div class='card kpi'><span>Account Equity</span><b>{_fmt(worth, cur)}</b></div>"
         f"<div class='card kpi'><span>Invested</span><b>{_fmt(total_target, cur)}</b></div>"
         f"<div class='card kpi'><span>Cash</span><b>{_fmt(cash, cur)}</b></div>"
         f"<div class='card kpi'><span>Exposure</span><b>{exposure:.1f}%</b>"
@@ -729,11 +770,17 @@ def _pnl_section(pnl: dict, cur: str) -> str:
     )
 
 
-def _history_section(hist: list[dict], cur: str) -> str:
+def _history_section(hist: list[dict], cur: str, *, ticks_hidden: int = 0) -> str:
     head = "<div class='card'><h2>Portfolio value over cycles</h2>"
+    hidden = (
+        f"<p class='muted'>{ticks_hidden} risk-tick note(s) between cycles are "
+        "not counted as cycles.</p>"
+        if ticks_hidden
+        else ""
+    )
     if len(hist) < 2:
         state = f"{len(hist)} cycle(s) logged so far." if hist else "No history yet."
-        return head + f"<p class='muted'>{state} The chart needs 2+ portfolio cycles.</p></div>"
+        return head + hidden + f"<p class='muted'>{state} The chart needs 2+ portfolio cycles.</p></div>"
 
     series = [_row_worth(h) for h in hist]
     labels = [_cycle_label(h) for h in hist]
@@ -745,7 +792,7 @@ def _history_section(hist: list[dict], cur: str) -> str:
     chart = _axis_chart(
         series,
         labels,
-        y_title=f"Total portfolio worth ({cur})",
+        y_title=f"Account equity ({cur})",
         x_title="Portfolio cycle",
         baseline=baseline,
     )
@@ -755,7 +802,8 @@ def _history_section(hist: list[dict], cur: str) -> str:
     vs_start = (series[-1] - baseline) if baseline else None
 
     body = (
-        "<p class='muted'>One point per portfolio cycle; the dashed line is the "
+        hidden
+        + "<p class='muted'>One point per portfolio cycle; the dashed line is the "
         "starting account value. Values are the paper ledger's <code>equity</code>.</p>"
         + (chart or "<p class='muted'>Not plottable.</p>")
         + f"<p class='delta'>Cycle-over-cycle <b class='{_pnl_class(gain)}'>"
@@ -791,7 +839,7 @@ def _history_section(hist: list[dict], cur: str) -> str:
         )
     body += (
         "<div class='scroll'><table><thead><tr><th>Cycle</th><th>Time (UTC)</th>"
-        "<th>Worth</th><th>Invested</th><th>Exposure</th><th>Cash</th>"
+        "<th>Equity</th><th>Invested</th><th>Exposure</th><th>Cash</th>"
         "<th>Positions</th><th>Took</th><th>Total P&amp;L</th>"
         "</tr></thead><tbody>" + "".join(rows) + "</tbody></table></div>"
     )
@@ -880,7 +928,7 @@ def build() -> str:
         + _positions(actions, score_by_coin, _num(snap.get("account_size")), cur, cycle_fills)
         + _fills_section(cycle_fills, cycle_rows, cycle, cur, symbol_by_coin)
         + _pnl_section(pnl, cur)
-        + _history_section(hist, cur)
+        + _history_section(hist, cur, ticks_hidden=_count_hidden_rows())
         + _signals(opps)
         + "<div class='card'><h2>Manager rationale</h2>"
         + f"<p>{_esc(plan.get('rationale') or '—')}</p>"

@@ -128,8 +128,8 @@ def test_kpi_shows_zero_equity_not_account(panel, sandbox):
     head = html.split("Profit / loss")[0]
     # the KPI tile reads the real equity (0), not the 10,000 account size
     import re as _re
-    kpi = _re.search(r"<span>Portfolio worth</span><b>([^<]*)</b>", head)
-    assert kpi, "Portfolio worth KPI tile missing"
+    kpi = _re.search(r"<span>Account Equity</span><b>([^<]*)</b>", head)
+    assert kpi, "Account Equity KPI tile missing"
     assert kpi.group(1).strip().startswith("0")
 
 
@@ -148,8 +148,8 @@ def test_chart_and_table_agree_without_equity_key(panel, sandbox):
          "base_currency": "usd", "plan": {"actions": []}},
     )
     html = panel.build()
-    table = html.split("Worth")[1]
-    assert ">0<" not in table  # no zero cells where the worth should be
+    table = html.split("<th>Equity</th>")[1]
+    assert ">0<" not in table  # no zero cells where the equity should be
     assert "10,000" in table
 
 

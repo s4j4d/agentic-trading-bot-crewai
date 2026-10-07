@@ -201,7 +201,7 @@ def test_positions_still_works_without_the_fills_argument():
         [{"coin_id": "bitcoin", "symbol": "BTC", "action": "open", "current": 0, "target": 2500}],
         {"bitcoin": 78}, 10000.0, "usd",
     )
-    assert "<span>Portfolio worth</span>" not in html
+    assert "<span>Account Equity</span>" not in html
     assert "BTC" in html and "2,500" in html
 
 
