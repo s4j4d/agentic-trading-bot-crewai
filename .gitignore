@@ -8,6 +8,4 @@ pytest-cache-files-*/
 memory
 .crewai
 output
-.graphify-out/
 .tmp_crewai_storage/
-graphify-out/
