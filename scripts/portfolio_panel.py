@@ -94,16 +94,34 @@ def _fmt_dur(seconds: object) -> str:
     return f"{h}h {rem // 60:02d}m"
 
 
-def _compact(v: float) -> str:
-    """Short number for axis ticks: 12.3k / 1.20M."""
+def _compact(v: float, decimals: int = 1) -> str:
+    """Short number for axis ticks: 12.3k / 1.20M.
+
+    `decimals` lets the chart add precision when the ticks would otherwise
+    all render as the same string; it keeps the default appearance.
+    """
     a = abs(v)
     if a >= 1_000_000:
-        return f"{v / 1_000_000:.2f}M"
+        return f"{v / 1_000_000:.{decimals + 1}f}M"
     if a >= 1_000:
-        return f"{v / 1_000:.1f}k"
+        return f"{v / 1_000:.{decimals}f}k"
     if a >= 10:
-        return f"{v:,.0f}"
-    return f"{v:.2f}"
+        return f"{v:,.{max(decimals - 1, 0)}f}"
+    return f"{v:.{decimals + 1}f}"
+
+
+def _distinct_tick_labels(values: list[float]) -> list[str]:
+    """Axis tick labels, adding decimals until no two render identically.
+
+    A narrow equity band (e.g. 9,990-10,050) made every tick round to
+    "10.0k", so the y axis read as one flat value. Escalate precision
+    rather than drop or merge ticks: five points must stay five points.
+    """
+    for decimals in (1, 2, 3):
+        labels = [_compact(v, decimals) for v in values]
+        if len(set(labels)) == len(labels):
+            return labels
+    return [_compact(v, 3) for v in values]
 
 
 def _lvl(v: object) -> str:
@@ -376,14 +394,16 @@ def _axis_chart(
         f'aria-label="{_esc(y_title or "value")} by {_esc(x_title)}">'
     ]
     # horizontal gridlines + y tick labels
-    for k in ([2] if flat else [0, 1, 2, 3, 4]):
-        v = lo + span * k / 4
+    tick_vals = [lo + span * k / 4 for k in ([2] if flat else [0, 1, 2, 3, 4])]
+    # Escalate tick precision when rounding would collapse them to one value.
+    tick_labels = _distinct_tick_labels(tick_vals) if not flat else [_compact(tick_vals[0])]
+    for v, lab in zip(tick_vals, tick_labels):
         y = yy(v)
         out.append(
             f'<line x1="{ml}" y1="{y:.1f}" x2="{ml + iw}" y2="{y:.1f}" '
             f'class="grid"/>'
             f'<text x="{ml - 8}" y="{y + 4:.1f}" class="tick" text-anchor="end">'
-            f"{_esc(_compact(v))}</text>"
+            f"{_esc(lab)}</text>"
         )
     if flat:
         out.append(

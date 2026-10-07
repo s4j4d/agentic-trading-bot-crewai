@@ -67,6 +67,14 @@ def test_axis_chart_flat_series_has_one_tick(panel):
     assert "unchanged at 10.0k" in labels
 
 
+def test_axis_chart_y_ticks_distinct_for_small_range(panel):
+    """Regression: with values near-constant, _compact rendered all five
+    y-ticks as the same string ("10.0k"), leaving the axis unreadable."""
+    svg = panel._axis_chart([10000.0, 10050.0, 9990.0, 10020.0])
+    ticks = [t for t in _texts(svg) if t and t[0].isdigit()]
+    assert len(ticks) == len(set(ticks)), f"duplicate y-tick labels: {ticks}"
+
+
 def test_axis_chart_escapes_user_text(panel):
     svg = panel._axis_chart([1.0, 2.0], ["<script>x</script>", "b"], y_title='"><img onerror=x>')
     assert "<script>" not in svg
