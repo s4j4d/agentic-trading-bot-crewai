@@ -8,7 +8,7 @@
   "6": "ExchangeClient",
   "7": "_load_jsonc",
   "8": "technical_indicators.py",
-  "9": "CryptoCouncilFlow",
+  "9": "TestManagePortfolioStep",
   "10": "main.py",
   "11": "scout_tools.py",
   "12": "_run",
@@ -47,7 +47,7 @@
   "45": "test_panel_levels.py",
   "46": "TestEnvSeconds",
   "47": "test_panel_axes.py",
-  "48": "model_validator",
+  "48": "TestPortfolioPlanDTO",
   "49": "test_paper_ledger_pnl.py",
   "50": "Step-by-step tasks",
   "51": "council_crew.py",
@@ -59,9 +59,10 @@
   "57": "_fetch_ohlcv_coingecko",
   "58": "execution_base.py",
   "59": "Balance",
-  "60": "TestFactory",
+  "60": "test_execution_base.py",
   "61": "OrderResult",
   "62": "CryptoCouncilState",
   "63": "CoinOpportunity",
-  "64": "OrderRequest"
+  "64": "OrderRequest",
+  "65": "CryptoCouncilFlow"
 }

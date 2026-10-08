@@ -420,6 +420,19 @@
       "source_location": "L163"
     },
     {
+      "id": "tests_test_portfolio_testportfolioplandto",
+      "label": "TestPortfolioPlanDTO",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "community": 48,
+      "community_name": "TestPortfolioPlanDTO",
+      "file_type": "code",
+      "norm_label": "testportfolioplandto",
+      "source_file": "tests/test_portfolio.py",
+      "source_location": "L225"
+    },
+    {
       "id": "src_crypto_council_flow_tools_portfolio_tools_allocatoropportunity",
       "label": "AllocatorOpportunity",
       "_callable": true,
@@ -548,19 +561,6 @@
       "norm_label": "testportfolioexposuretool",
       "source_file": "tests/test_portfolio.py",
       "source_location": "L18"
-    },
-    {
-      "id": "tests_test_portfolio_testportfolioplandto",
-      "label": "TestPortfolioPlanDTO",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "community": 5,
-      "community_name": "portfolio_tools.py",
-      "file_type": "code",
-      "norm_label": "testportfolioplandto",
-      "source_file": "tests/test_portfolio.py",
-      "source_location": "L225"
     },
     {
       "id": "tests_test_portfolio_testrebalanceallocatortool",
@@ -781,7 +781,7 @@
       "file_type": "code",
       "norm_label": "executionclient",
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L320"
+      "source_location": "L317"
     },
     {
       "id": "tests_test_execution_base_testabstractness",
@@ -794,7 +794,7 @@
       "file_type": "code",
       "norm_label": "testabstractness",
       "source_file": "tests/test_execution_base.py",
-      "source_location": "L147"
+      "source_location": "L141"
     },
     {
       "id": "tests_test_cycle_markers_testhistoryrowmarkers",
@@ -924,7 +924,7 @@
       "file_type": "code",
       "norm_label": "fill",
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L274"
+      "source_location": "L271"
     },
     {
       "id": "tests_test_execution_base_testbalanceandfill",
@@ -937,7 +937,7 @@
       "file_type": "code",
       "norm_label": "testbalanceandfill",
       "source_file": "tests/test_execution_base.py",
-      "source_location": "L118"
+      "source_location": "L112"
     },
     {
       "id": "src_crypto_council_flow_tools_exchange_base_exchangeclient",
@@ -966,17 +966,30 @@
       "source_location": "L84"
     },
     {
+      "id": "tests_test_execution_base_dummyclient",
+      "label": "_DummyClient",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "community": 60,
+      "community_name": "test_execution_base.py",
+      "file_type": "code",
+      "norm_label": "_dummyclient",
+      "source_file": "tests/test_execution_base.py",
+      "source_location": "L197"
+    },
+    {
       "id": "tests_test_execution_base_testfactory",
       "label": "TestFactory",
       "_callable": true,
       "_callable_class": true,
       "_origin": "ast",
       "community": 60,
-      "community_name": "TestFactory",
+      "community_name": "test_execution_base.py",
       "file_type": "code",
       "norm_label": "testfactory",
       "source_file": "tests/test_execution_base.py",
-      "source_location": "L230"
+      "source_location": "L231"
     },
     {
       "id": "src_crypto_council_flow_tools_execution_base_orderresult",
@@ -989,7 +1002,7 @@
       "file_type": "code",
       "norm_label": "orderresult",
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L217"
+      "source_location": "L214"
     },
     {
       "id": "tests_test_execution_base_testorderresult",
@@ -1002,7 +1015,7 @@
       "file_type": "code",
       "norm_label": "testorderresult",
       "source_file": "tests/test_execution_base.py",
-      "source_location": "L87"
+      "source_location": "L81"
     },
     {
       "id": "src_crypto_council_flow_main_cryptocouncilstate",
@@ -1081,6 +1094,19 @@
       "norm_label": "testorderrequest",
       "source_file": "tests/test_execution_base.py",
       "source_location": "L20"
+    },
+    {
+      "id": "src_crypto_council_flow_main_cryptocouncilflow",
+      "label": "CryptoCouncilFlow",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "community": 65,
+      "community_name": "CryptoCouncilFlow",
+      "file_type": "code",
+      "norm_label": "cryptocouncilflow",
+      "source_file": "src/crypto_council_flow/main.py",
+      "source_location": "L305"
     },
     {
       "id": "tests_test_load_jsonc_testloadjsoncedgecases",
@@ -1245,7 +1271,7 @@
       "_callable_class": true,
       "_origin": "ast",
       "community": 9,
-      "community_name": "CryptoCouncilFlow",
+      "community_name": "TestManagePortfolioStep",
       "file_type": "code",
       "norm_label": "portfolioaction",
       "source_file": "src/crypto_council_flow/crews/council/council_crew.py",
@@ -1258,7 +1284,7 @@
       "_callable_class": true,
       "_origin": "ast",
       "community": 9,
-      "community_name": "CryptoCouncilFlow",
+      "community_name": "TestManagePortfolioStep",
       "file_type": "code",
       "norm_label": "portfolioplan",
       "source_file": "src/crypto_council_flow/crews/council/council_crew.py",
@@ -1271,24 +1297,11 @@
       "_callable_class": true,
       "_origin": "ast",
       "community": 9,
-      "community_name": "CryptoCouncilFlow",
+      "community_name": "TestManagePortfolioStep",
       "file_type": "code",
       "norm_label": "scoutopportunity",
       "source_file": "src/crypto_council_flow/crews/council/council_crew.py",
       "source_location": "L211"
-    },
-    {
-      "id": "src_crypto_council_flow_main_cryptocouncilflow",
-      "label": "CryptoCouncilFlow",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "community": 9,
-      "community_name": "CryptoCouncilFlow",
-      "file_type": "code",
-      "norm_label": "cryptocouncilflow",
-      "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L305"
     },
     {
       "id": "tests_test_portfolio_testmanageportfoliostep",
@@ -1297,7 +1310,7 @@
       "_callable_class": true,
       "_origin": "ast",
       "community": 9,
-      "community_name": "CryptoCouncilFlow",
+      "community_name": "TestManagePortfolioStep",
       "file_type": "code",
       "norm_label": "testmanageportfoliostep",
       "source_file": "tests/test_portfolio.py",
@@ -1506,6 +1519,18 @@
       "norm_label": ".portfolio_management_task()",
       "source_file": "src/crypto_council_flow/crews/council/council_crew.py",
       "source_location": "L585"
+    },
+    {
+      "id": "src_crypto_council_flow_crews_council_council_crew_councilportfoliocrew_portfolio_manager",
+      "label": ".portfolio_manager()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 1,
+      "community_name": "CouncilAnalysisCrew",
+      "file_type": "code",
+      "norm_label": ".portfolio_manager()",
+      "source_file": "src/crypto_council_flow/crews/council/council_crew.py",
+      "source_location": "L567"
     },
     {
       "id": "src_crypto_council_flow_crews_council_council_crew_councilscoutcrew_crew",
@@ -2838,18 +2863,6 @@
       "norm_label": ".analyse_coins()",
       "source_file": "src/crypto_council_flow/main.py",
       "source_location": "L384"
-    },
-    {
-      "id": "src_crypto_council_flow_main_cryptocouncilflow_run_scout",
-      "label": ".run_scout()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 20,
-      "community_name": ".analyse_coins",
-      "file_type": "code",
-      "norm_label": ".run_scout()",
-      "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L315"
     },
     {
       "id": "src_crypto_council_flow_main_extract_verdict",
@@ -4292,64 +4305,88 @@
       "source_location": "L101"
     },
     {
-      "id": "src_crypto_council_flow_tools_execution_base_balance_normalise_aliases",
-      "label": "._normalise_aliases()",
+      "id": "tests_test_portfolio_testportfolioplandto_test_action_aliases_converge",
+      "label": ".test_action_aliases_converge()",
       "_callable": true,
       "_origin": "ast",
       "community": 48,
-      "community_name": "model_validator",
+      "community_name": "TestPortfolioPlanDTO",
       "file_type": "code",
-      "norm_label": "._normalise_aliases()",
-      "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L126"
+      "norm_label": ".test_action_aliases_converge()",
+      "source_file": "tests/test_portfolio.py",
+      "source_location": "L247"
     },
     {
-      "id": "src_crypto_council_flow_tools_execution_base_fill_normalise_aliases",
-      "label": "._normalise_aliases()",
+      "id": "tests_test_portfolio_testportfolioplandto_test_action_carries_optional_risk_levels",
+      "label": ".test_action_carries_optional_risk_levels()",
       "_callable": true,
       "_origin": "ast",
       "community": 48,
-      "community_name": "model_validator",
+      "community_name": "TestPortfolioPlanDTO",
       "file_type": "code",
-      "norm_label": "._normalise_aliases()",
-      "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L292"
+      "norm_label": ".test_action_carries_optional_risk_levels()",
+      "source_file": "tests/test_portfolio.py",
+      "source_location": "L279"
     },
     {
-      "id": "src_crypto_council_flow_tools_execution_base_orderrequest_check_shape",
-      "label": "._check_shape()",
+      "id": "tests_test_portfolio_testportfolioplandto_test_action_junk_levels_become_none",
+      "label": ".test_action_junk_levels_become_none()",
       "_callable": true,
       "_origin": "ast",
       "community": 48,
-      "community_name": "model_validator",
+      "community_name": "TestPortfolioPlanDTO",
       "file_type": "code",
-      "norm_label": "._check_shape()",
-      "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L200"
+      "norm_label": ".test_action_junk_levels_become_none()",
+      "source_file": "tests/test_portfolio.py",
+      "source_location": "L300"
     },
     {
-      "id": "src_crypto_council_flow_tools_execution_base_orderrequest_normalise_aliases",
-      "label": "._normalise_aliases()",
+      "id": "tests_test_portfolio_testportfolioplandto_test_action_levels_default_to_none",
+      "label": ".test_action_levels_default_to_none()",
       "_callable": true,
       "_origin": "ast",
       "community": 48,
-      "community_name": "model_validator",
+      "community_name": "TestPortfolioPlanDTO",
       "file_type": "code",
-      "norm_label": "._normalise_aliases()",
-      "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L163"
+      "norm_label": ".test_action_levels_default_to_none()",
+      "source_file": "tests/test_portfolio.py",
+      "source_location": "L290"
     },
     {
-      "id": "src_crypto_council_flow_tools_execution_base_orderresult_normalise_aliases",
-      "label": "._normalise_aliases()",
+      "id": "tests_test_portfolio_testportfolioplandto_test_canonical_validates",
+      "label": ".test_canonical_validates()",
       "_callable": true,
       "_origin": "ast",
       "community": 48,
-      "community_name": "model_validator",
+      "community_name": "TestPortfolioPlanDTO",
       "file_type": "code",
-      "norm_label": "._normalise_aliases()",
-      "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L240"
+      "norm_label": ".test_canonical_validates()",
+      "source_file": "tests/test_portfolio.py",
+      "source_location": "L226"
+    },
+    {
+      "id": "tests_test_portfolio_testportfolioplandto_test_close_action_keeps_levels",
+      "label": ".test_close_action_keeps_levels()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 48,
+      "community_name": "TestPortfolioPlanDTO",
+      "file_type": "code",
+      "norm_label": ".test_close_action_keeps_levels()",
+      "source_file": "tests/test_portfolio.py",
+      "source_location": "L311"
+    },
+    {
+      "id": "tests_test_portfolio_testportfolioplandto_test_unknown_action_falls_back_to_hold",
+      "label": ".test_unknown_action_falls_back_to_hold()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 48,
+      "community_name": "TestPortfolioPlanDTO",
+      "file_type": "code",
+      "norm_label": ".test_unknown_action_falls_back_to_hold()",
+      "source_file": "tests/test_portfolio.py",
+      "source_location": "L270"
     },
     {
       "id": "src_crypto_council_flow_tools_technical_indicators_valid_coingecko_days",
@@ -4616,18 +4653,6 @@
       "source_location": "L147"
     },
     {
-      "id": "src_crypto_council_flow_crews_council_council_crew_councilportfoliocrew_portfolio_manager",
-      "label": ".portfolio_manager()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 5,
-      "community_name": "portfolio_tools.py",
-      "file_type": "code",
-      "norm_label": ".portfolio_manager()",
-      "source_file": "src/crypto_council_flow/crews/council/council_crew.py",
-      "source_location": "L567"
-    },
-    {
       "id": "src_crypto_council_flow_crews_council_council_crew_portfolio_tools",
       "label": "_portfolio_tools()",
       "_callable": true,
@@ -4794,90 +4819,6 @@
       "norm_label": ".test_total_cap_breach_flagged()",
       "source_file": "tests/test_portfolio.py",
       "source_location": "L51"
-    },
-    {
-      "id": "tests_test_portfolio_testportfolioplandto_test_action_aliases_converge",
-      "label": ".test_action_aliases_converge()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 5,
-      "community_name": "portfolio_tools.py",
-      "file_type": "code",
-      "norm_label": ".test_action_aliases_converge()",
-      "source_file": "tests/test_portfolio.py",
-      "source_location": "L247"
-    },
-    {
-      "id": "tests_test_portfolio_testportfolioplandto_test_action_carries_optional_risk_levels",
-      "label": ".test_action_carries_optional_risk_levels()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 5,
-      "community_name": "portfolio_tools.py",
-      "file_type": "code",
-      "norm_label": ".test_action_carries_optional_risk_levels()",
-      "source_file": "tests/test_portfolio.py",
-      "source_location": "L279"
-    },
-    {
-      "id": "tests_test_portfolio_testportfolioplandto_test_action_junk_levels_become_none",
-      "label": ".test_action_junk_levels_become_none()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 5,
-      "community_name": "portfolio_tools.py",
-      "file_type": "code",
-      "norm_label": ".test_action_junk_levels_become_none()",
-      "source_file": "tests/test_portfolio.py",
-      "source_location": "L300"
-    },
-    {
-      "id": "tests_test_portfolio_testportfolioplandto_test_action_levels_default_to_none",
-      "label": ".test_action_levels_default_to_none()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 5,
-      "community_name": "portfolio_tools.py",
-      "file_type": "code",
-      "norm_label": ".test_action_levels_default_to_none()",
-      "source_file": "tests/test_portfolio.py",
-      "source_location": "L290"
-    },
-    {
-      "id": "tests_test_portfolio_testportfolioplandto_test_canonical_validates",
-      "label": ".test_canonical_validates()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 5,
-      "community_name": "portfolio_tools.py",
-      "file_type": "code",
-      "norm_label": ".test_canonical_validates()",
-      "source_file": "tests/test_portfolio.py",
-      "source_location": "L226"
-    },
-    {
-      "id": "tests_test_portfolio_testportfolioplandto_test_close_action_keeps_levels",
-      "label": ".test_close_action_keeps_levels()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 5,
-      "community_name": "portfolio_tools.py",
-      "file_type": "code",
-      "norm_label": ".test_close_action_keeps_levels()",
-      "source_file": "tests/test_portfolio.py",
-      "source_location": "L311"
-    },
-    {
-      "id": "tests_test_portfolio_testportfolioplandto_test_unknown_action_falls_back_to_hold",
-      "label": ".test_unknown_action_falls_back_to_hold()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 5,
-      "community_name": "portfolio_tools.py",
-      "file_type": "code",
-      "norm_label": ".test_unknown_action_falls_back_to_hold()",
-      "source_file": "tests/test_portfolio.py",
-      "source_location": "L270"
     },
     {
       "id": "tests_test_portfolio_testrebalanceallocatortool_test_dust_delta_is_hold",
@@ -5405,7 +5346,7 @@
       "file_type": "code",
       "norm_label": ".close()",
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L394"
+      "source_location": "L391"
     },
     {
       "id": "src_crypto_council_flow_tools_execution_base_executionclient_describe",
@@ -5417,7 +5358,7 @@
       "file_type": "code",
       "norm_label": ".describe()",
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L391"
+      "source_location": "L388"
     },
     {
       "id": "src_crypto_council_flow_tools_execution_base_executionclient_enter",
@@ -5429,7 +5370,7 @@
       "file_type": "code",
       "norm_label": ".__enter__()",
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L397"
+      "source_location": "L394"
     },
     {
       "id": "src_crypto_council_flow_tools_execution_base_executionclient_exit",
@@ -5441,7 +5382,31 @@
       "file_type": "code",
       "norm_label": ".__exit__()",
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L400"
+      "source_location": "L397"
+    },
+    {
+      "id": "src_crypto_council_flow_tools_execution_base_executionclient_get_balances",
+      "label": ".get_balances()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 54,
+      "community_name": "ExecutionClient",
+      "file_type": "code",
+      "norm_label": ".get_balances()",
+      "source_file": "src/crypto_council_flow/tools/execution_base.py",
+      "source_location": "L341"
+    },
+    {
+      "id": "src_crypto_council_flow_tools_execution_base_executionclient_get_fills",
+      "label": ".get_fills()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 54,
+      "community_name": "ExecutionClient",
+      "file_type": "code",
+      "norm_label": ".get_fills()",
+      "source_file": "src/crypto_council_flow/tools/execution_base.py",
+      "source_location": "L369"
     },
     {
       "id": "src_crypto_council_flow_tools_execution_base_executionclient_get_market_constraints",
@@ -5453,7 +5418,7 @@
       "file_type": "code",
       "norm_label": ".get_market_constraints()",
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L381"
+      "source_location": "L378"
     },
     {
       "id": "src_crypto_council_flow_tools_execution_base_executionclient_init",
@@ -5465,7 +5430,7 @@
       "file_type": "code",
       "norm_label": ".__init__()",
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L337"
+      "source_location": "L334"
     },
     {
       "id": "src_crypto_council_flow_tools_execution_base_executionerror_init",
@@ -5489,7 +5454,7 @@
       "file_type": "code",
       "norm_label": ".test_cannot_instantiate_base()",
       "source_file": "tests/test_execution_base.py",
-      "source_location": "L148"
+      "source_location": "L142"
     },
     {
       "id": "tests_test_execution_base_testabstractness_test_default_market_constraints_empty",
@@ -5501,7 +5466,7 @@
       "file_type": "code",
       "norm_label": ".test_default_market_constraints_empty()",
       "source_file": "tests/test_execution_base.py",
-      "source_location": "L168"
+      "source_location": "L162"
     },
     {
       "id": "tests_test_execution_base_testabstractness_test_subclass_must_implement_all_methods",
@@ -5513,7 +5478,7 @@
       "file_type": "code",
       "norm_label": ".test_subclass_must_implement_all_methods()",
       "source_file": "tests/test_execution_base.py",
-      "source_location": "L154"
+      "source_location": "L148"
     },
     {
       "id": "tests_test_cycle_markers_testhistoryrowmarkers_test_both_writers_are_found",
@@ -5681,7 +5646,7 @@
       "file_type": "code",
       "norm_label": "get_execution_client()",
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L440"
+      "source_location": "L437"
     },
     {
       "id": "src_crypto_council_flow_tools_execution_base_get_execution_mode",
@@ -5693,7 +5658,7 @@
       "file_type": "code",
       "norm_label": "get_execution_mode()",
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L435"
+      "source_location": "L432"
     },
     {
       "id": "src_crypto_council_flow_tools_execution_base_load_builtin_clients",
@@ -5705,7 +5670,7 @@
       "file_type": "code",
       "norm_label": "_load_builtin_clients()",
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L422"
+      "source_location": "L419"
     },
     {
       "id": "src_crypto_council_flow_tools_execution_base_register_execution_client",
@@ -5717,7 +5682,7 @@
       "file_type": "code",
       "norm_label": "register_execution_client()",
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L412"
+      "source_location": "L409"
     },
     {
       "id": "src_crypto_council_flow_tools_execution_base_registered_clients",
@@ -5729,31 +5694,67 @@
       "file_type": "code",
       "norm_label": "registered_clients()",
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L418"
+      "source_location": "L415"
     },
     {
-      "id": "src_crypto_council_flow_tools_execution_base_executionclient_get_balances",
-      "label": ".get_balances()",
+      "id": "src_crypto_council_flow_tools_execution_base_balance_normalise_aliases",
+      "label": "._normalise_aliases()",
       "_callable": true,
       "_origin": "ast",
       "community": 59,
       "community_name": "Balance",
       "file_type": "code",
-      "norm_label": ".get_balances()",
+      "norm_label": "._normalise_aliases()",
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L344"
+      "source_location": "L126"
     },
     {
-      "id": "src_crypto_council_flow_tools_execution_base_executionclient_get_fills",
-      "label": ".get_fills()",
+      "id": "src_crypto_council_flow_tools_execution_base_fill_normalise_aliases",
+      "label": "._normalise_aliases()",
       "_callable": true,
       "_origin": "ast",
       "community": 59,
       "community_name": "Balance",
       "file_type": "code",
-      "norm_label": ".get_fills()",
+      "norm_label": "._normalise_aliases()",
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L372"
+      "source_location": "L289"
+    },
+    {
+      "id": "src_crypto_council_flow_tools_execution_base_orderrequest_check_shape",
+      "label": "._check_shape()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 59,
+      "community_name": "Balance",
+      "file_type": "code",
+      "norm_label": "._check_shape()",
+      "source_file": "src/crypto_council_flow/tools/execution_base.py",
+      "source_location": "L200"
+    },
+    {
+      "id": "src_crypto_council_flow_tools_execution_base_orderrequest_normalise_aliases",
+      "label": "._normalise_aliases()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 59,
+      "community_name": "Balance",
+      "file_type": "code",
+      "norm_label": "._normalise_aliases()",
+      "source_file": "src/crypto_council_flow/tools/execution_base.py",
+      "source_location": "L163"
+    },
+    {
+      "id": "src_crypto_council_flow_tools_execution_base_orderresult_normalise_aliases",
+      "label": "._normalise_aliases()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 59,
+      "community_name": "Balance",
+      "file_type": "code",
+      "norm_label": "._normalise_aliases()",
+      "source_file": "src/crypto_council_flow/tools/execution_base.py",
+      "source_location": "L237"
     },
     {
       "id": "tests_test_execution_base_testbalanceandfill_test_balance_explicit_total_respected",
@@ -5765,7 +5766,7 @@
       "file_type": "code",
       "norm_label": ".test_balance_explicit_total_respected()",
       "source_file": "tests/test_execution_base.py",
-      "source_location": "L126"
+      "source_location": "L120"
     },
     {
       "id": "tests_test_execution_base_testbalanceandfill_test_balance_total_derived",
@@ -5777,7 +5778,7 @@
       "file_type": "code",
       "norm_label": ".test_balance_total_derived()",
       "source_file": "tests/test_execution_base.py",
-      "source_location": "L119"
+      "source_location": "L113"
     },
     {
       "id": "tests_test_execution_base_testbalanceandfill_test_fill_cost_derived_and_aliases",
@@ -5789,7 +5790,7 @@
       "file_type": "code",
       "norm_label": ".test_fill_cost_derived_and_aliases()",
       "source_file": "tests/test_execution_base.py",
-      "source_location": "L132"
+      "source_location": "L126"
     },
     {
       "id": "src_crypto_council_flow_tools_exchange_base_exchangeclient_close",
@@ -5924,16 +5925,28 @@
       "source_location": "L179"
     },
     {
+      "id": "tests_test_execution_base_dummyclient_init",
+      "label": ".__init__()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 60,
+      "community_name": "test_execution_base.py",
+      "file_type": "code",
+      "norm_label": ".__init__()",
+      "source_file": "tests/test_execution_base.py",
+      "source_location": "L200"
+    },
+    {
       "id": "tests_test_execution_base_make_factory",
       "label": "_make_factory()",
       "_callable": true,
       "_origin": "ast",
       "community": 60,
-      "community_name": "TestFactory",
+      "community_name": "test_execution_base.py",
       "file_type": "code",
       "norm_label": "_make_factory()",
       "source_file": "tests/test_execution_base.py",
-      "source_location": "L203"
+      "source_location": "L204"
     },
     {
       "id": "tests_test_execution_base_testfactory_test_default_mode_is_paper",
@@ -5941,11 +5954,11 @@
       "_callable": true,
       "_origin": "ast",
       "community": 60,
-      "community_name": "TestFactory",
+      "community_name": "test_execution_base.py",
       "file_type": "code",
       "norm_label": ".test_default_mode_is_paper()",
       "source_file": "tests/test_execution_base.py",
-      "source_location": "L231"
+      "source_location": "L232"
     },
     {
       "id": "tests_test_execution_base_testfactory_test_halted_kill_switch",
@@ -5953,11 +5966,11 @@
       "_callable": true,
       "_origin": "ast",
       "community": 60,
-      "community_name": "TestFactory",
+      "community_name": "test_execution_base.py",
       "file_type": "code",
       "norm_label": ".test_halted_kill_switch()",
       "source_file": "tests/test_execution_base.py",
-      "source_location": "L237"
+      "source_location": "L238"
     },
     {
       "id": "tests_test_execution_base_testfactory_test_live_falls_back_to_exchange_var",
@@ -5965,11 +5978,11 @@
       "_callable": true,
       "_origin": "ast",
       "community": 60,
-      "community_name": "TestFactory",
+      "community_name": "test_execution_base.py",
       "file_type": "code",
       "norm_label": ".test_live_falls_back_to_exchange_var()",
       "source_file": "tests/test_execution_base.py",
-      "source_location": "L279"
+      "source_location": "L280"
     },
     {
       "id": "tests_test_execution_base_testfactory_test_live_venue_selected_by_env",
@@ -5977,11 +5990,11 @@
       "_callable": true,
       "_origin": "ast",
       "community": 60,
-      "community_name": "TestFactory",
+      "community_name": "test_execution_base.py",
       "file_type": "code",
       "norm_label": ".test_live_venue_selected_by_env()",
       "source_file": "tests/test_execution_base.py",
-      "source_location": "L264"
+      "source_location": "L265"
     },
     {
       "id": "tests_test_execution_base_testfactory_test_module_is_importable_without_concrete_clients",
@@ -5989,11 +6002,11 @@
       "_callable": true,
       "_origin": "ast",
       "community": 60,
-      "community_name": "TestFactory",
+      "community_name": "test_execution_base.py",
       "file_type": "code",
       "norm_label": ".test_module_is_importable_without_concrete_clients()",
       "source_file": "tests/test_execution_base.py",
-      "source_location": "L291"
+      "source_location": "L292"
     },
     {
       "id": "tests_test_execution_base_testfactory_test_registered_paper_client_returned",
@@ -6001,11 +6014,11 @@
       "_callable": true,
       "_origin": "ast",
       "community": 60,
-      "community_name": "TestFactory",
+      "community_name": "test_execution_base.py",
       "file_type": "code",
       "norm_label": ".test_registered_paper_client_returned()",
       "source_file": "tests/test_execution_base.py",
-      "source_location": "L253"
+      "source_location": "L254"
     },
     {
       "id": "tests_test_execution_base_testfactory_test_unregistered_mode_raises",
@@ -6013,11 +6026,11 @@
       "_callable": true,
       "_origin": "ast",
       "community": 60,
-      "community_name": "TestFactory",
+      "community_name": "test_execution_base.py",
       "file_type": "code",
       "norm_label": ".test_unregistered_mode_raises()",
       "source_file": "tests/test_execution_base.py",
-      "source_location": "L244"
+      "source_location": "L245"
     },
     {
       "id": "src_crypto_council_flow_tools_execution_base_executionclient_cancel_order",
@@ -6029,7 +6042,7 @@
       "file_type": "code",
       "norm_label": ".cancel_order()",
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L359"
+      "source_location": "L356"
     },
     {
       "id": "src_crypto_council_flow_tools_execution_base_executionclient_get_open_orders",
@@ -6041,7 +6054,7 @@
       "file_type": "code",
       "norm_label": ".get_open_orders()",
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L368"
+      "source_location": "L365"
     },
     {
       "id": "src_crypto_council_flow_tools_execution_base_executionclient_get_order",
@@ -6053,7 +6066,7 @@
       "file_type": "code",
       "norm_label": ".get_order()",
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L363"
+      "source_location": "L360"
     },
     {
       "id": "src_crypto_council_flow_tools_execution_base_executionclient_place_order",
@@ -6065,7 +6078,7 @@
       "file_type": "code",
       "norm_label": ".place_order()",
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L350"
+      "source_location": "L347"
     },
     {
       "id": "src_crypto_council_flow_tools_execution_base_orderresult_is_final",
@@ -6077,7 +6090,7 @@
       "file_type": "code",
       "norm_label": ".is_final()",
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L267"
+      "source_location": "L264"
     },
     {
       "id": "tests_test_execution_base_testorderresult_test_ccxt_aliases",
@@ -6089,7 +6102,7 @@
       "file_type": "code",
       "norm_label": ".test_ccxt_aliases()",
       "source_file": "tests/test_execution_base.py",
-      "source_location": "L88"
+      "source_location": "L82"
     },
     {
       "id": "tests_test_execution_base_testorderresult_test_is_final_states",
@@ -6101,7 +6114,7 @@
       "file_type": "code",
       "norm_label": ".test_is_final_states()",
       "source_file": "tests/test_execution_base.py",
-      "source_location": "L109"
+      "source_location": "L103"
     },
     {
       "id": "tests_test_models_testcryptocouncilstate_test_analysis_reports_dict",
@@ -6293,7 +6306,7 @@
       "file_type": "code",
       "norm_label": ".test_alias_convergence()",
       "source_file": "tests/test_execution_base.py",
-      "source_location": "L68"
+      "source_location": "L62"
     },
     {
       "id": "tests_test_execution_base_testorderrequest_test_limit_requires_price",
@@ -6305,7 +6318,7 @@
       "file_type": "code",
       "norm_label": ".test_limit_requires_price()",
       "source_file": "tests/test_execution_base.py",
-      "source_location": "L42"
+      "source_location": "L36"
     },
     {
       "id": "tests_test_execution_base_testorderrequest_test_market_with_notional",
@@ -6317,7 +6330,7 @@
       "file_type": "code",
       "norm_label": ".test_market_with_notional()",
       "source_file": "tests/test_execution_base.py",
-      "source_location": "L33"
+      "source_location": "L27"
     },
     {
       "id": "tests_test_execution_base_testorderrequest_test_post_only_only_for_limit",
@@ -6329,7 +6342,7 @@
       "file_type": "code",
       "norm_label": ".test_post_only_only_for_limit()",
       "source_file": "tests/test_execution_base.py",
-      "source_location": "L52"
+      "source_location": "L46"
     },
     {
       "id": "tests_test_execution_base_testorderrequest_test_rejects_bad_side_and_type",
@@ -6341,19 +6354,7 @@
       "file_type": "code",
       "norm_label": ".test_rejects_bad_side_and_type()",
       "source_file": "tests/test_execution_base.py",
-      "source_location": "L60"
-    },
-    {
-      "id": "tests_test_execution_base_testorderrequest_test_rejects_both_qty_and_notional",
-      "label": ".test_rejects_both_qty_and_notional()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 64,
-      "community_name": "OrderRequest",
-      "file_type": "code",
-      "norm_label": ".test_rejects_both_qty_and_notional()",
-      "source_file": "tests/test_execution_base.py",
-      "source_location": "L27"
+      "source_location": "L54"
     },
     {
       "id": "tests_test_execution_base_testorderrequest_test_requires_qty_or_notional",
@@ -6366,6 +6367,42 @@
       "norm_label": ".test_requires_qty_or_notional()",
       "source_file": "tests/test_execution_base.py",
       "source_location": "L21"
+    },
+    {
+      "id": "src_crypto_council_flow_main_cryptocouncilflow_run_scout",
+      "label": ".run_scout()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 65,
+      "community_name": "CryptoCouncilFlow",
+      "file_type": "code",
+      "norm_label": ".run_scout()",
+      "source_file": "src/crypto_council_flow/main.py",
+      "source_location": "L315"
+    },
+    {
+      "id": "src_crypto_council_flow_main_plot",
+      "label": "plot()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 65,
+      "community_name": "CryptoCouncilFlow",
+      "file_type": "code",
+      "norm_label": "plot()",
+      "source_file": "src/crypto_council_flow/main.py",
+      "source_location": "L1572"
+    },
+    {
+      "id": "tests_test_portfolio_testmanageportfoliostep_test_manage_portfolio_skips_when_no_opportunities",
+      "label": ".test_manage_portfolio_skips_when_no_opportunities()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 65,
+      "community_name": "CryptoCouncilFlow",
+      "file_type": "code",
+      "norm_label": ".test_manage_portfolio_skips_when_no_opportunities()",
+      "source_file": "tests/test_portfolio.py",
+      "source_location": "L427"
     },
     {
       "id": "src_crypto_council_flow_crews_council_council_crew_load_jsonc",
@@ -6721,7 +6758,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 9,
-      "community_name": "CryptoCouncilFlow",
+      "community_name": "TestManagePortfolioStep",
       "file_type": "code",
       "norm_label": "._normalise_aliases()",
       "source_file": "src/crypto_council_flow/crews/council/council_crew.py",
@@ -6733,7 +6770,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 9,
-      "community_name": "CryptoCouncilFlow",
+      "community_name": "TestManagePortfolioStep",
       "file_type": "code",
       "norm_label": "._normalise_aliases()",
       "source_file": "src/crypto_council_flow/crews/council/council_crew.py",
@@ -6745,23 +6782,11 @@
       "_callable": true,
       "_origin": "ast",
       "community": 9,
-      "community_name": "CryptoCouncilFlow",
+      "community_name": "TestManagePortfolioStep",
       "file_type": "code",
       "norm_label": "._normalise_aliases()",
       "source_file": "src/crypto_council_flow/crews/council/council_crew.py",
       "source_location": "L232"
-    },
-    {
-      "id": "src_crypto_council_flow_main_plot",
-      "label": "plot()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 9,
-      "community_name": "CryptoCouncilFlow",
-      "file_type": "code",
-      "norm_label": "plot()",
-      "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L1572"
     },
     {
       "id": "tests_test_portfolio_testmanageportfoliostep_flow_with_opportunities",
@@ -6769,7 +6794,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 9,
-      "community_name": "CryptoCouncilFlow",
+      "community_name": "TestManagePortfolioStep",
       "file_type": "code",
       "norm_label": "._flow_with_opportunities()",
       "source_file": "tests/test_portfolio.py",
@@ -6781,7 +6806,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 9,
-      "community_name": "CryptoCouncilFlow",
+      "community_name": "TestManagePortfolioStep",
       "file_type": "code",
       "norm_label": ".test_manage_portfolio_keeps_previous_plan_on_failure()",
       "source_file": "tests/test_portfolio.py",
@@ -6793,23 +6818,11 @@
       "_callable": true,
       "_origin": "ast",
       "community": 9,
-      "community_name": "CryptoCouncilFlow",
+      "community_name": "TestManagePortfolioStep",
       "file_type": "code",
       "norm_label": ".test_manage_portfolio_saves_plan()",
       "source_file": "tests/test_portfolio.py",
       "source_location": "L384"
-    },
-    {
-      "id": "tests_test_portfolio_testmanageportfoliostep_test_manage_portfolio_skips_when_no_opportunities",
-      "label": ".test_manage_portfolio_skips_when_no_opportunities()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 9,
-      "community_name": "CryptoCouncilFlow",
-      "file_type": "code",
-      "norm_label": ".test_manage_portfolio_skips_when_no_opportunities()",
-      "source_file": "tests/test_portfolio.py",
-      "source_location": "L427"
     },
     {
       "id": "tests_test_portfolio_testmanageportfoliostep_test_second_cycle_uses_previous_targets_as_positions",
@@ -6817,7 +6830,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 9,
-      "community_name": "CryptoCouncilFlow",
+      "community_name": "TestManagePortfolioStep",
       "file_type": "code",
       "norm_label": ".test_second_cycle_uses_previous_targets_as_positions()",
       "source_file": "tests/test_portfolio.py",
@@ -9328,17 +9341,6 @@
       "source_location": ""
     },
     {
-      "id": "start",
-      "label": "start",
-      "_origin": "ast",
-      "community": 20,
-      "community_name": ".analyse_coins",
-      "file_type": "code",
-      "norm_label": "start",
-      "source_file": "",
-      "source_location": ""
-    },
-    {
       "id": "src_crypto_council_flow_main_rationale_1295",
       "label": "Pull a short verdict excerpt from the tail of an analysis report.\u2026",
       "_origin": "ast",
@@ -9425,17 +9427,6 @@
       "norm_label": "per-step 'due in x' summary for the scheduler tick log. the scheduler wakes...",
       "source_file": "src/crypto_council_flow/main.py",
       "source_location": "L280"
-    },
-    {
-      "id": "src_crypto_council_flow_main_rationale_316",
-      "label": "Run CouncilScoutCrew to refresh the opportunity list. Called once at startup\u2026",
-      "_origin": "ast",
-      "community": 20,
-      "community_name": ".analyse_coins",
-      "file_type": "rationale",
-      "norm_label": "run councilscoutcrew to refresh the opportunity list. called once at startup...",
-      "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L316"
     },
     {
       "id": "src_crypto_council_flow_main_rationale_385",
@@ -11945,17 +11936,6 @@
       "source_location": "L71"
     },
     {
-      "id": "src_crypto_council_flow_tools_execution_base_py_model_validator",
-      "label": "model_validator",
-      "_origin": "ast",
-      "community": 48,
-      "community_name": "model_validator",
-      "file_type": "code",
-      "norm_label": "model_validator",
-      "source_file": "",
-      "source_location": ""
-    },
-    {
       "id": "tests_test_paper_ledger_pnl",
       "label": "test_paper_ledger_pnl.py",
       "_origin": "ast",
@@ -12719,7 +12699,7 @@
       "source_location": ""
     },
     {
-      "id": "src_crypto_council_flow_tools_execution_base_rationale_321",
+      "id": "src_crypto_council_flow_tools_execution_base_rationale_318",
       "label": "Abstract base for order placement and account state on a venue. Concrete\u2026",
       "_origin": "ast",
       "community": 54,
@@ -12727,10 +12707,32 @@
       "file_type": "rationale",
       "norm_label": "abstract base for order placement and account state on a venue. concrete...",
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L321"
+      "source_location": "L318"
     },
     {
-      "id": "src_crypto_council_flow_tools_execution_base_rationale_382",
+      "id": "src_crypto_council_flow_tools_execution_base_rationale_342",
+      "label": "Return balances, optionally limited to ``assets`` (upper-case).",
+      "_origin": "ast",
+      "community": 54,
+      "community_name": "ExecutionClient",
+      "file_type": "rationale",
+      "norm_label": "return balances, optionally limited to ``assets`` (upper-case).",
+      "source_file": "src/crypto_council_flow/tools/execution_base.py",
+      "source_location": "L342"
+    },
+    {
+      "id": "src_crypto_council_flow_tools_execution_base_rationale_372",
+      "label": "Return executed trades, newest-last, optionally since an epoch-ms watermark.\u2026",
+      "_origin": "ast",
+      "community": 54,
+      "community_name": "ExecutionClient",
+      "file_type": "rationale",
+      "norm_label": "return executed trades, newest-last, optionally since an epoch-ms watermark....",
+      "source_file": "src/crypto_council_flow/tools/execution_base.py",
+      "source_location": "L372"
+    },
+    {
+      "id": "src_crypto_council_flow_tools_execution_base_rationale_379",
       "label": "Return tick/lot/min-notional for a symbol when the venue exposes it. Default:\u2026",
       "_origin": "ast",
       "community": 54,
@@ -12738,10 +12740,10 @@
       "file_type": "rationale",
       "norm_label": "return tick/lot/min-notional for a symbol when the venue exposes it. default:...",
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L382"
+      "source_location": "L379"
     },
     {
-      "id": "src_crypto_council_flow_tools_execution_base_rationale_395",
+      "id": "src_crypto_council_flow_tools_execution_base_rationale_392",
       "label": "Release any held resources. Safe to call more than once.",
       "_origin": "ast",
       "community": 54,
@@ -12749,7 +12751,7 @@
       "file_type": "rationale",
       "norm_label": "release any held resources. safe to call more than once.",
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L395"
+      "source_location": "L392"
     },
     {
       "id": "tests_test_cycle_markers",
@@ -12950,7 +12952,7 @@
       "source_location": "L107"
     },
     {
-      "id": "src_crypto_council_flow_tools_execution_base_rationale_413",
+      "id": "src_crypto_council_flow_tools_execution_base_rationale_410",
       "label": "Register a client factory under ``name`` (matched against EXECUTION_MODE for\u2026",
       "_origin": "ast",
       "community": 58,
@@ -12958,10 +12960,10 @@
       "file_type": "rationale",
       "norm_label": "register a client factory under ``name`` (matched against execution_mode for...",
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L413"
+      "source_location": "L410"
     },
     {
-      "id": "src_crypto_council_flow_tools_execution_base_rationale_423",
+      "id": "src_crypto_council_flow_tools_execution_base_rationale_420",
       "label": "Import concrete client modules so their self-registration runs. Concrete\u2026",
       "_origin": "ast",
       "community": 58,
@@ -12969,10 +12971,10 @@
       "file_type": "rationale",
       "norm_label": "import concrete client modules so their self-registration runs. concrete...",
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L423"
+      "source_location": "L420"
     },
     {
-      "id": "src_crypto_council_flow_tools_execution_base_rationale_436",
+      "id": "src_crypto_council_flow_tools_execution_base_rationale_433",
       "label": "Resolve the configured mode: paper | live | halted (default paper).",
       "_origin": "ast",
       "community": 58,
@@ -12980,10 +12982,10 @@
       "file_type": "rationale",
       "norm_label": "resolve the configured mode: paper | live | halted (default paper).",
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L436"
+      "source_location": "L433"
     },
     {
-      "id": "src_crypto_council_flow_tools_execution_base_rationale_441",
+      "id": "src_crypto_council_flow_tools_execution_base_rationale_438",
       "label": "Factory: return the execution client selected by env config. ``EXECUTION_MODE``\u2026",
       "_origin": "ast",
       "community": 58,
@@ -12991,7 +12993,7 @@
       "file_type": "rationale",
       "norm_label": "factory: return the execution client selected by env config. ``execution_mode``...",
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L441"
+      "source_location": "L438"
     },
     {
       "id": "src_crypto_council_flow_tools_execution_base_rationale_94",
@@ -13016,6 +13018,17 @@
       "source_location": ""
     },
     {
+      "id": "src_crypto_council_flow_tools_execution_base_py_model_validator",
+      "label": "model_validator",
+      "_origin": "ast",
+      "community": 59,
+      "community_name": "Balance",
+      "file_type": "code",
+      "norm_label": "model_validator",
+      "source_file": "",
+      "source_location": ""
+    },
+    {
       "id": "src_crypto_council_flow_tools_execution_base_rationale_115",
       "label": "Account balance for a single asset.",
       "_origin": "ast",
@@ -13027,7 +13040,7 @@
       "source_location": "L115"
     },
     {
-      "id": "src_crypto_council_flow_tools_execution_base_rationale_275",
+      "id": "src_crypto_council_flow_tools_execution_base_rationale_272",
       "label": "One executed trade. Fees are only knowable post-fill.",
       "_origin": "ast",
       "community": 59,
@@ -13035,29 +13048,7 @@
       "file_type": "rationale",
       "norm_label": "one executed trade. fees are only knowable post-fill.",
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L275"
-    },
-    {
-      "id": "src_crypto_council_flow_tools_execution_base_rationale_345",
-      "label": "Return balances, optionally limited to ``assets`` (upper-case).",
-      "_origin": "ast",
-      "community": 59,
-      "community_name": "Balance",
-      "file_type": "rationale",
-      "norm_label": "return balances, optionally limited to ``assets`` (upper-case).",
-      "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L345"
-    },
-    {
-      "id": "src_crypto_council_flow_tools_execution_base_rationale_375",
-      "label": "Return executed trades, newest-last, optionally since an epoch-ms watermark.\u2026",
-      "_origin": "ast",
-      "community": 59,
-      "community_name": "Balance",
-      "file_type": "rationale",
-      "norm_label": "return executed trades, newest-last, optionally since an epoch-ms watermark....",
-      "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L375"
+      "source_location": "L272"
     },
     {
       "id": "src_crypto_council_flow_tools_exchange_base_py_any",
@@ -13130,7 +13121,7 @@
       "label": "test_execution_base.py",
       "_origin": "ast",
       "community": 60,
-      "community_name": "TestFactory",
+      "community_name": "test_execution_base.py",
       "file_type": "code",
       "norm_label": "test_execution_base.py",
       "source_file": "tests/test_execution_base.py",
@@ -13141,25 +13132,36 @@
       "label": "Tests for the abstract execution interface (tools/execution_base.py). Slices:\u2026",
       "_origin": "ast",
       "community": 60,
-      "community_name": "TestFactory",
+      "community_name": "test_execution_base.py",
       "file_type": "rationale",
       "norm_label": "tests for the abstract execution interface (tools/execution_base.py). slices:...",
       "source_file": "tests/test_execution_base.py",
       "source_location": "L1"
     },
     {
-      "id": "tests_test_execution_base_rationale_292",
+      "id": "tests_test_execution_base_rationale_198",
+      "label": "Not a real ExecutionClient \u2014 only used to prove registry dispatch.",
+      "_origin": "ast",
+      "community": 60,
+      "community_name": "test_execution_base.py",
+      "file_type": "rationale",
+      "norm_label": "not a real executionclient \u2014 only used to prove registry dispatch.",
+      "source_file": "tests/test_execution_base.py",
+      "source_location": "L198"
+    },
+    {
+      "id": "tests_test_execution_base_rationale_293",
       "label": "The interface must not depend on any concrete client existing.",
       "_origin": "ast",
       "community": 60,
-      "community_name": "TestFactory",
+      "community_name": "test_execution_base.py",
       "file_type": "rationale",
       "norm_label": "the interface must not depend on any concrete client existing.",
       "source_file": "tests/test_execution_base.py",
-      "source_location": "L292"
+      "source_location": "L293"
     },
     {
-      "id": "src_crypto_council_flow_tools_execution_base_rationale_218",
+      "id": "src_crypto_council_flow_tools_execution_base_rationale_215",
       "label": "Normalized outcome of a placed/cancelled/queried order.",
       "_origin": "ast",
       "community": 61,
@@ -13167,10 +13169,10 @@
       "file_type": "rationale",
       "norm_label": "normalized outcome of a placed/cancelled/queried order.",
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L218"
+      "source_location": "L215"
     },
     {
-      "id": "src_crypto_council_flow_tools_execution_base_rationale_351",
+      "id": "src_crypto_council_flow_tools_execution_base_rationale_348",
       "label": "Submit an order. Raises ``ExecutionError`` on rejection/failure.\u2026",
       "_origin": "ast",
       "community": 61,
@@ -13178,10 +13180,10 @@
       "file_type": "rationale",
       "norm_label": "submit an order. raises ``executionerror`` on rejection/failure....",
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L351"
+      "source_location": "L348"
     },
     {
-      "id": "src_crypto_council_flow_tools_execution_base_rationale_360",
+      "id": "src_crypto_council_flow_tools_execution_base_rationale_357",
       "label": "Cancel a live order and return its terminal state.",
       "_origin": "ast",
       "community": 61,
@@ -13189,10 +13191,10 @@
       "file_type": "rationale",
       "norm_label": "cancel a live order and return its terminal state.",
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L360"
+      "source_location": "L357"
     },
     {
-      "id": "src_crypto_council_flow_tools_execution_base_rationale_364",
+      "id": "src_crypto_council_flow_tools_execution_base_rationale_361",
       "label": "Return one order's current state, or None if the venue has no record of it\u2026",
       "_origin": "ast",
       "community": 61,
@@ -13200,10 +13202,10 @@
       "file_type": "rationale",
       "norm_label": "return one order's current state, or none if the venue has no record of it...",
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L364"
+      "source_location": "L361"
     },
     {
-      "id": "src_crypto_council_flow_tools_execution_base_rationale_369",
+      "id": "src_crypto_council_flow_tools_execution_base_rationale_366",
       "label": "List live (unfilled/partially filled) orders.",
       "_origin": "ast",
       "community": 61,
@@ -13211,7 +13213,7 @@
       "file_type": "rationale",
       "norm_label": "list live (unfilled/partially filled) orders.",
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L369"
+      "source_location": "L366"
     },
     {
       "id": "src_crypto_council_flow_main_py_basemodel",
@@ -13289,6 +13291,50 @@
       "norm_label": "a venue-agnostic order intent. exactly one of ``qty`` (base amount) or...",
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
       "source_location": "L140"
+    },
+    {
+      "id": "start",
+      "label": "start",
+      "_origin": "ast",
+      "community": 65,
+      "community_name": "CryptoCouncilFlow",
+      "file_type": "code",
+      "norm_label": "start",
+      "source_file": "",
+      "source_location": ""
+    },
+    {
+      "id": "src_crypto_council_flow_main_rationale_1573",
+      "label": "Generate a flow diagram HTML file.",
+      "_origin": "ast",
+      "community": 65,
+      "community_name": "CryptoCouncilFlow",
+      "file_type": "rationale",
+      "norm_label": "generate a flow diagram html file.",
+      "source_file": "src/crypto_council_flow/main.py",
+      "source_location": "L1573"
+    },
+    {
+      "id": "src_crypto_council_flow_main_rationale_306",
+      "label": "Three-step CrewAI Flow: run_scout \u2014 market_scout produces a ranked coin list\u2026",
+      "_origin": "ast",
+      "community": 65,
+      "community_name": "CryptoCouncilFlow",
+      "file_type": "rationale",
+      "norm_label": "three-step crewai flow: run_scout \u2014 market_scout produces a ranked coin list...",
+      "source_file": "src/crypto_council_flow/main.py",
+      "source_location": "L306"
+    },
+    {
+      "id": "src_crypto_council_flow_main_rationale_316",
+      "label": "Run CouncilScoutCrew to refresh the opportunity list. Called once at startup\u2026",
+      "_origin": "ast",
+      "community": 65,
+      "community_name": "CryptoCouncilFlow",
+      "file_type": "rationale",
+      "norm_label": "run councilscoutcrew to refresh the opportunity list. called once at startup...",
+      "source_file": "src/crypto_council_flow/main.py",
+      "source_location": "L316"
     },
     {
       "id": "src_crypto_council_flow_crews_council_council_crew_py_any",
@@ -13493,7 +13539,7 @@
       "label": "BaseModel",
       "_origin": "ast",
       "community": 9,
-      "community_name": "CryptoCouncilFlow",
+      "community_name": "TestManagePortfolioStep",
       "file_type": "code",
       "norm_label": "basemodel",
       "source_file": "",
@@ -13504,7 +13550,7 @@
       "label": "model_validator",
       "_origin": "ast",
       "community": 9,
-      "community_name": "CryptoCouncilFlow",
+      "community_name": "TestManagePortfolioStep",
       "file_type": "code",
       "norm_label": "model_validator",
       "source_file": "",
@@ -13515,7 +13561,7 @@
       "label": "Single canonical DTO for scout output. CrewAI's output validation works against\u2026",
       "_origin": "ast",
       "community": 9,
-      "community_name": "CryptoCouncilFlow",
+      "community_name": "TestManagePortfolioStep",
       "file_type": "rationale",
       "norm_label": "single canonical dto for scout output. crewai's output validation works against...",
       "source_file": "src/crypto_council_flow/crews/council/council_crew.py",
@@ -13526,7 +13572,7 @@
       "label": "One per-coin rebalance action. One DTO, never two.",
       "_origin": "ast",
       "community": 9,
-      "community_name": "CryptoCouncilFlow",
+      "community_name": "TestManagePortfolioStep",
       "file_type": "rationale",
       "norm_label": "one per-coin rebalance action. one dto, never two.",
       "source_file": "src/crypto_council_flow/crews/council/council_crew.py",
@@ -13537,33 +13583,11 @@
       "label": "Cap-aware rebalance plan. Single canonical DTO for portfolio output.",
       "_origin": "ast",
       "community": 9,
-      "community_name": "CryptoCouncilFlow",
+      "community_name": "TestManagePortfolioStep",
       "file_type": "rationale",
       "norm_label": "cap-aware rebalance plan. single canonical dto for portfolio output.",
       "source_file": "src/crypto_council_flow/crews/council/council_crew.py",
       "source_location": "L516"
-    },
-    {
-      "id": "src_crypto_council_flow_main_rationale_1573",
-      "label": "Generate a flow diagram HTML file.",
-      "_origin": "ast",
-      "community": 9,
-      "community_name": "CryptoCouncilFlow",
-      "file_type": "rationale",
-      "norm_label": "generate a flow diagram html file.",
-      "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L1573"
-    },
-    {
-      "id": "src_crypto_council_flow_main_rationale_306",
-      "label": "Three-step CrewAI Flow: run_scout \u2014 market_scout produces a ranked coin list\u2026",
-      "_origin": "ast",
-      "community": 9,
-      "community_name": "CryptoCouncilFlow",
-      "file_type": "rationale",
-      "norm_label": "three-step crewai flow: run_scout \u2014 market_scout produces a ranked coin list...",
-      "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L306"
     }
   ],
   "links": [
@@ -15532,7 +15556,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L401",
+      "source_location": "L398",
       "weight": 1.0
     },
     {
@@ -15556,7 +15580,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L447",
+      "source_location": "L444",
       "weight": 1.0
     },
     {
@@ -15568,7 +15592,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L448",
+      "source_location": "L445",
       "weight": 1.0
     },
     {
@@ -15580,7 +15604,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L451",
+      "source_location": "L448",
       "weight": 1.0
     },
     {
@@ -15592,7 +15616,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L463",
+      "source_location": "L460",
       "weight": 1.0
     },
     {
@@ -15604,7 +15628,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L466",
+      "source_location": "L463",
       "weight": 1.0
     },
     {
@@ -16480,7 +16504,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "tests/test_execution_base.py",
-      "source_location": "L284",
+      "source_location": "L285",
       "weight": 1.0
     },
     {
@@ -16492,7 +16516,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "tests/test_execution_base.py",
-      "source_location": "L269",
+      "source_location": "L270",
       "weight": 1.0
     },
     {
@@ -16504,7 +16528,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "tests/test_execution_base.py",
-      "source_location": "L259",
+      "source_location": "L260",
       "weight": 1.0
     },
     {
@@ -18592,7 +18616,7 @@
       "confidence_score": 1.0,
       "context": "decorator",
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L290",
+      "source_location": "L287",
       "weight": 1.0
     },
     {
@@ -18628,7 +18652,7 @@
       "confidence_score": 1.0,
       "context": "decorator",
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L238",
+      "source_location": "L235",
       "weight": 1.0
     },
     {
@@ -19156,7 +19180,7 @@
       "confidence_score": 1.0,
       "context": "generic_arg",
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L344",
+      "source_location": "L341",
       "weight": 1.0
     },
     {
@@ -19168,7 +19192,7 @@
       "confidence_score": 1.0,
       "context": "generic_arg",
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L372",
+      "source_location": "L369",
       "weight": 1.0
     },
     {
@@ -19180,7 +19204,7 @@
       "confidence_score": 1.0,
       "context": "generic_arg",
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L381",
+      "source_location": "L378",
       "weight": 1.0
     },
     {
@@ -19192,7 +19216,7 @@
       "confidence_score": 1.0,
       "context": "generic_arg",
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L368",
+      "source_location": "L365",
       "weight": 1.0
     },
     {
@@ -20440,7 +20464,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L350",
+      "source_location": "L347",
       "weight": 1.0
     },
     {
@@ -20464,7 +20488,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L412",
+      "source_location": "L409",
       "weight": 1.0
     },
     {
@@ -20740,7 +20764,7 @@
       "confidence_score": 1.0,
       "context": "return_type",
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L359",
+      "source_location": "L356",
       "weight": 1.0
     },
     {
@@ -20752,7 +20776,7 @@
       "confidence_score": 1.0,
       "context": "return_type",
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L397",
+      "source_location": "L394",
       "weight": 1.0
     },
     {
@@ -20764,7 +20788,7 @@
       "confidence_score": 1.0,
       "context": "return_type",
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L363",
+      "source_location": "L360",
       "weight": 1.0
     },
     {
@@ -20776,7 +20800,7 @@
       "confidence_score": 1.0,
       "context": "return_type",
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L350",
+      "source_location": "L347",
       "weight": 1.0
     },
     {
@@ -20788,7 +20812,7 @@
       "confidence_score": 1.0,
       "context": "return_type",
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L440",
+      "source_location": "L437",
       "weight": 1.0
     },
     {
@@ -24779,7 +24803,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L217",
+      "source_location": "L214",
       "weight": 1.0
     },
     {
@@ -24790,7 +24814,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L274",
+      "source_location": "L271",
       "weight": 1.0
     },
     {
@@ -24801,7 +24825,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L320",
+      "source_location": "L317",
       "weight": 1.0
     },
     {
@@ -24812,7 +24836,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L412",
+      "source_location": "L409",
       "weight": 1.0
     },
     {
@@ -24823,7 +24847,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L418",
+      "source_location": "L415",
       "weight": 1.0
     },
     {
@@ -24834,7 +24858,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L422",
+      "source_location": "L419",
       "weight": 1.0
     },
     {
@@ -24845,7 +24869,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L435",
+      "source_location": "L432",
       "weight": 1.0
     },
     {
@@ -24856,7 +24880,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L440",
+      "source_location": "L437",
       "weight": 1.0
     },
     {
@@ -25989,7 +26013,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "tests/test_execution_base.py",
-      "source_location": "L118",
+      "source_location": "L112",
       "weight": 1.0
     },
     {
@@ -26000,7 +26024,18 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "tests/test_execution_base.py",
-      "source_location": "L147",
+      "source_location": "L141",
+      "weight": 1.0
+    },
+    {
+      "source": "tests_test_execution_base",
+      "target": "tests_test_execution_base_dummyclient",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "tests/test_execution_base.py",
+      "source_location": "L197",
       "weight": 1.0
     },
     {
@@ -26022,7 +26057,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "tests/test_execution_base.py",
-      "source_location": "L203",
+      "source_location": "L204",
       "weight": 1.0
     },
     {
@@ -26033,7 +26068,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "tests/test_execution_base.py",
-      "source_location": "L230",
+      "source_location": "L231",
       "weight": 1.0
     },
     {
@@ -26044,7 +26079,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "tests/test_execution_base.py",
-      "source_location": "L87",
+      "source_location": "L81",
       "weight": 1.0
     },
     {
@@ -27892,7 +27927,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L274",
+      "source_location": "L271",
       "weight": 1.0
     },
     {
@@ -27914,7 +27949,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L217",
+      "source_location": "L214",
       "weight": 1.0
     },
     {
@@ -28805,7 +28840,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L337",
+      "source_location": "L334",
       "weight": 1.0
     },
     {
@@ -28816,7 +28851,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L344",
+      "source_location": "L341",
       "weight": 1.0
     },
     {
@@ -28827,7 +28862,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L350",
+      "source_location": "L347",
       "weight": 1.0
     },
     {
@@ -28838,7 +28873,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L359",
+      "source_location": "L356",
       "weight": 1.0
     },
     {
@@ -28849,7 +28884,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L363",
+      "source_location": "L360",
       "weight": 1.0
     },
     {
@@ -28860,7 +28895,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L368",
+      "source_location": "L365",
       "weight": 1.0
     },
     {
@@ -28871,7 +28906,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L372",
+      "source_location": "L369",
       "weight": 1.0
     },
     {
@@ -28882,7 +28917,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L381",
+      "source_location": "L378",
       "weight": 1.0
     },
     {
@@ -28893,7 +28928,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L391",
+      "source_location": "L388",
       "weight": 1.0
     },
     {
@@ -28904,7 +28939,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L394",
+      "source_location": "L391",
       "weight": 1.0
     },
     {
@@ -28915,7 +28950,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L397",
+      "source_location": "L394",
       "weight": 1.0
     },
     {
@@ -28926,7 +28961,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L400",
+      "source_location": "L397",
       "weight": 1.0
     },
     {
@@ -28948,7 +28983,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L292",
+      "source_location": "L289",
       "weight": 1.0
     },
     {
@@ -28981,7 +29016,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L240",
+      "source_location": "L237",
       "weight": 1.0
     },
     {
@@ -28992,7 +29027,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L267",
+      "source_location": "L264",
       "weight": 1.0
     },
     {
@@ -29392,6 +29427,17 @@
       "weight": 1.0
     },
     {
+      "source": "tests_test_execution_base_dummyclient",
+      "target": "tests_test_execution_base_dummyclient_init",
+      "relation": "method",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "tests/test_execution_base.py",
+      "source_location": "L200",
+      "weight": 1.0
+    },
+    {
       "source": "tests_test_execution_base_testabstractness",
       "target": "tests_test_execution_base_testabstractness_test_cannot_instantiate_base",
       "relation": "method",
@@ -29399,7 +29445,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "tests/test_execution_base.py",
-      "source_location": "L148",
+      "source_location": "L142",
       "weight": 1.0
     },
     {
@@ -29410,7 +29456,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "tests/test_execution_base.py",
-      "source_location": "L154",
+      "source_location": "L148",
       "weight": 1.0
     },
     {
@@ -29421,7 +29467,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "tests/test_execution_base.py",
-      "source_location": "L168",
+      "source_location": "L162",
       "weight": 1.0
     },
     {
@@ -29432,7 +29478,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "tests/test_execution_base.py",
-      "source_location": "L119",
+      "source_location": "L113",
       "weight": 1.0
     },
     {
@@ -29443,7 +29489,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "tests/test_execution_base.py",
-      "source_location": "L126",
+      "source_location": "L120",
       "weight": 1.0
     },
     {
@@ -29454,7 +29500,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "tests/test_execution_base.py",
-      "source_location": "L132",
+      "source_location": "L126",
       "weight": 1.0
     },
     {
@@ -29465,7 +29511,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "tests/test_execution_base.py",
-      "source_location": "L231",
+      "source_location": "L232",
       "weight": 1.0
     },
     {
@@ -29476,7 +29522,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "tests/test_execution_base.py",
-      "source_location": "L237",
+      "source_location": "L238",
       "weight": 1.0
     },
     {
@@ -29487,7 +29533,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "tests/test_execution_base.py",
-      "source_location": "L244",
+      "source_location": "L245",
       "weight": 1.0
     },
     {
@@ -29498,7 +29544,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "tests/test_execution_base.py",
-      "source_location": "L253",
+      "source_location": "L254",
       "weight": 1.0
     },
     {
@@ -29509,7 +29555,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "tests/test_execution_base.py",
-      "source_location": "L264",
+      "source_location": "L265",
       "weight": 1.0
     },
     {
@@ -29520,7 +29566,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "tests/test_execution_base.py",
-      "source_location": "L279",
+      "source_location": "L280",
       "weight": 1.0
     },
     {
@@ -29531,7 +29577,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "tests/test_execution_base.py",
-      "source_location": "L291",
+      "source_location": "L292",
       "weight": 1.0
     },
     {
@@ -29547,7 +29593,7 @@
     },
     {
       "source": "tests_test_execution_base_testorderrequest",
-      "target": "tests_test_execution_base_testorderrequest_test_rejects_both_qty_and_notional",
+      "target": "tests_test_execution_base_testorderrequest_test_market_with_notional",
       "relation": "method",
       "_origin": "ast",
       "confidence": "EXTRACTED",
@@ -29558,24 +29604,13 @@
     },
     {
       "source": "tests_test_execution_base_testorderrequest",
-      "target": "tests_test_execution_base_testorderrequest_test_market_with_notional",
-      "relation": "method",
-      "_origin": "ast",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": "tests/test_execution_base.py",
-      "source_location": "L33",
-      "weight": 1.0
-    },
-    {
-      "source": "tests_test_execution_base_testorderrequest",
       "target": "tests_test_execution_base_testorderrequest_test_limit_requires_price",
       "relation": "method",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "tests/test_execution_base.py",
-      "source_location": "L42",
+      "source_location": "L36",
       "weight": 1.0
     },
     {
@@ -29586,7 +29621,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "tests/test_execution_base.py",
-      "source_location": "L52",
+      "source_location": "L46",
       "weight": 1.0
     },
     {
@@ -29597,7 +29632,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "tests/test_execution_base.py",
-      "source_location": "L60",
+      "source_location": "L54",
       "weight": 1.0
     },
     {
@@ -29608,7 +29643,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "tests/test_execution_base.py",
-      "source_location": "L68",
+      "source_location": "L62",
       "weight": 1.0
     },
     {
@@ -29619,7 +29654,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "tests/test_execution_base.py",
-      "source_location": "L109",
+      "source_location": "L103",
       "weight": 1.0
     },
     {
@@ -29630,7 +29665,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "tests/test_execution_base.py",
-      "source_location": "L88",
+      "source_location": "L82",
       "weight": 1.0
     },
     {
@@ -31471,168 +31506,168 @@
       "weight": 1.0
     },
     {
-      "source": "src_crypto_council_flow_tools_execution_base_rationale_218",
+      "source": "src_crypto_council_flow_tools_execution_base_rationale_215",
       "target": "src_crypto_council_flow_tools_execution_base_orderresult",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L218",
+      "source_location": "L215",
       "weight": 1.0
     },
     {
-      "source": "src_crypto_council_flow_tools_execution_base_rationale_275",
+      "source": "src_crypto_council_flow_tools_execution_base_rationale_272",
       "target": "src_crypto_council_flow_tools_execution_base_fill",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L275",
+      "source_location": "L272",
       "weight": 1.0
     },
     {
-      "source": "src_crypto_council_flow_tools_execution_base_rationale_321",
+      "source": "src_crypto_council_flow_tools_execution_base_rationale_318",
       "target": "src_crypto_council_flow_tools_execution_base_executionclient",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L321",
+      "source_location": "L318",
       "weight": 1.0
     },
     {
-      "source": "src_crypto_council_flow_tools_execution_base_rationale_345",
+      "source": "src_crypto_council_flow_tools_execution_base_rationale_342",
       "target": "src_crypto_council_flow_tools_execution_base_executionclient_get_balances",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L345",
+      "source_location": "L342",
       "weight": 1.0
     },
     {
-      "source": "src_crypto_council_flow_tools_execution_base_rationale_351",
+      "source": "src_crypto_council_flow_tools_execution_base_rationale_348",
       "target": "src_crypto_council_flow_tools_execution_base_executionclient_place_order",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L351",
+      "source_location": "L348",
       "weight": 1.0
     },
     {
-      "source": "src_crypto_council_flow_tools_execution_base_rationale_360",
+      "source": "src_crypto_council_flow_tools_execution_base_rationale_357",
       "target": "src_crypto_council_flow_tools_execution_base_executionclient_cancel_order",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L360",
+      "source_location": "L357",
       "weight": 1.0
     },
     {
-      "source": "src_crypto_council_flow_tools_execution_base_rationale_364",
+      "source": "src_crypto_council_flow_tools_execution_base_rationale_361",
       "target": "src_crypto_council_flow_tools_execution_base_executionclient_get_order",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L364",
+      "source_location": "L361",
       "weight": 1.0
     },
     {
-      "source": "src_crypto_council_flow_tools_execution_base_rationale_369",
+      "source": "src_crypto_council_flow_tools_execution_base_rationale_366",
       "target": "src_crypto_council_flow_tools_execution_base_executionclient_get_open_orders",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L369",
+      "source_location": "L366",
       "weight": 1.0
     },
     {
-      "source": "src_crypto_council_flow_tools_execution_base_rationale_375",
+      "source": "src_crypto_council_flow_tools_execution_base_rationale_372",
       "target": "src_crypto_council_flow_tools_execution_base_executionclient_get_fills",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L375",
+      "source_location": "L372",
       "weight": 1.0
     },
     {
-      "source": "src_crypto_council_flow_tools_execution_base_rationale_382",
+      "source": "src_crypto_council_flow_tools_execution_base_rationale_379",
       "target": "src_crypto_council_flow_tools_execution_base_executionclient_get_market_constraints",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L382",
+      "source_location": "L379",
       "weight": 1.0
     },
     {
-      "source": "src_crypto_council_flow_tools_execution_base_rationale_395",
+      "source": "src_crypto_council_flow_tools_execution_base_rationale_392",
       "target": "src_crypto_council_flow_tools_execution_base_executionclient_close",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L395",
+      "source_location": "L392",
       "weight": 1.0
     },
     {
-      "source": "src_crypto_council_flow_tools_execution_base_rationale_413",
+      "source": "src_crypto_council_flow_tools_execution_base_rationale_410",
       "target": "src_crypto_council_flow_tools_execution_base_register_execution_client",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L413",
+      "source_location": "L410",
       "weight": 1.0
     },
     {
-      "source": "src_crypto_council_flow_tools_execution_base_rationale_423",
+      "source": "src_crypto_council_flow_tools_execution_base_rationale_420",
       "target": "src_crypto_council_flow_tools_execution_base_load_builtin_clients",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L423",
+      "source_location": "L420",
       "weight": 1.0
     },
     {
-      "source": "src_crypto_council_flow_tools_execution_base_rationale_436",
+      "source": "src_crypto_council_flow_tools_execution_base_rationale_433",
       "target": "src_crypto_council_flow_tools_execution_base_get_execution_mode",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L436",
+      "source_location": "L433",
       "weight": 1.0
     },
     {
-      "source": "src_crypto_council_flow_tools_execution_base_rationale_441",
+      "source": "src_crypto_council_flow_tools_execution_base_rationale_438",
       "target": "src_crypto_council_flow_tools_execution_base_get_execution_client",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L441",
+      "source_location": "L438",
       "weight": 1.0
     },
     {
@@ -32098,14 +32133,25 @@
       "weight": 1.0
     },
     {
-      "source": "tests_test_execution_base_rationale_292",
+      "source": "tests_test_execution_base_rationale_198",
+      "target": "tests_test_execution_base_dummyclient",
+      "relation": "rationale_for",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "tests/test_execution_base.py",
+      "source_location": "L198",
+      "weight": 1.0
+    },
+    {
+      "source": "tests_test_execution_base_rationale_293",
       "target": "tests_test_execution_base_testfactory_test_module_is_importable_without_concrete_clients",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "tests/test_execution_base.py",
-      "source_location": "L292",
+      "source_location": "L293",
       "weight": 1.0
     },
     {
@@ -33183,7 +33229,7 @@
       "confidence_score": 0.85,
       "context": "call",
       "source_file": "tests/test_execution_base.py",
-      "source_location": "L152",
+      "source_location": "L146",
       "weight": 1.0
     },
     {
@@ -33195,7 +33241,7 @@
       "confidence_score": 0.85,
       "context": "call",
       "source_file": "tests/test_execution_base.py",
-      "source_location": "L129",
+      "source_location": "L123",
       "weight": 1.0
     },
     {
@@ -33207,7 +33253,7 @@
       "confidence_score": 0.85,
       "context": "call",
       "source_file": "tests/test_execution_base.py",
-      "source_location": "L122",
+      "source_location": "L116",
       "weight": 1.0
     },
     {
@@ -33219,7 +33265,7 @@
       "confidence_score": 0.85,
       "context": "call",
       "source_file": "tests/test_execution_base.py",
-      "source_location": "L135",
+      "source_location": "L129",
       "weight": 1.0
     },
     {
@@ -33231,7 +33277,7 @@
       "confidence_score": 0.85,
       "context": "call",
       "source_file": "tests/test_execution_base.py",
-      "source_location": "L71",
+      "source_location": "L65",
       "weight": 1.0
     },
     {
@@ -33243,7 +33289,7 @@
       "confidence_score": 0.85,
       "context": "call",
       "source_file": "tests/test_execution_base.py",
-      "source_location": "L46",
+      "source_location": "L40",
       "weight": 1.0
     },
     {
@@ -33255,7 +33301,7 @@
       "confidence_score": 0.85,
       "context": "call",
       "source_file": "tests/test_execution_base.py",
-      "source_location": "L36",
+      "source_location": "L30",
       "weight": 1.0
     },
     {
@@ -33267,7 +33313,7 @@
       "confidence_score": 0.85,
       "context": "call",
       "source_file": "tests/test_execution_base.py",
-      "source_location": "L56",
+      "source_location": "L50",
       "weight": 1.0
     },
     {
@@ -33279,19 +33325,7 @@
       "confidence_score": 0.85,
       "context": "call",
       "source_file": "tests/test_execution_base.py",
-      "source_location": "L64",
-      "weight": 1.0
-    },
-    {
-      "source": "tests_test_execution_base_testorderrequest_test_rejects_both_qty_and_notional",
-      "target": "src_crypto_council_flow_tools_execution_base_orderrequest",
-      "relation": "calls",
-      "_origin": "ast",
-      "confidence": "INFERRED",
-      "confidence_score": 0.85,
-      "context": "call",
-      "source_file": "tests/test_execution_base.py",
-      "source_location": "L31",
+      "source_location": "L58",
       "weight": 1.0
     },
     {
@@ -33315,7 +33349,7 @@
       "confidence_score": 0.85,
       "context": "call",
       "source_file": "tests/test_execution_base.py",
-      "source_location": "L91",
+      "source_location": "L85",
       "weight": 1.0
     },
     {
@@ -33327,7 +33361,7 @@
       "confidence_score": 0.85,
       "context": "call",
       "source_file": "tests/test_execution_base.py",
-      "source_location": "L113",
+      "source_location": "L107",
       "weight": 1.0
     },
     {
@@ -33964,7 +33998,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.95,
       "source_file": "tests/test_execution_base.py",
-      "source_location": "L206",
+      "source_location": "L207",
       "weight": 0.8
     },
     {
@@ -33975,7 +34009,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.95,
       "source_file": "tests/test_execution_base.py",
-      "source_location": "L152",
+      "source_location": "L146",
       "weight": 0.8
     },
     {
@@ -33986,7 +34020,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.95,
       "source_file": "tests/test_execution_base.py",
-      "source_location": "L122",
+      "source_location": "L116",
       "weight": 0.8
     },
     {
@@ -33997,7 +34031,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.95,
       "source_file": "tests/test_execution_base.py",
-      "source_location": "L135",
+      "source_location": "L129",
       "weight": 0.8
     },
     {
@@ -34019,7 +34053,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.95,
       "source_file": "tests/test_execution_base.py",
-      "source_location": "L91",
+      "source_location": "L85",
       "weight": 0.8
     },
     {

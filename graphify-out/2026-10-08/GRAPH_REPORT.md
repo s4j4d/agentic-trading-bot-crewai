@@ -1,12 +1,12 @@
 # Graph Report - crypto_council_flow  (2026-10-08)
 
 ## Corpus Check
-- 48 files · ~62,772 words
+- 48 files · ~62,777 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 1146 nodes · 1828 edges · 65 communities (62 shown, 2 thin omitted)
-- Extraction: 94% EXTRACTED · 6% INFERRED · 0% AMBIGUOUS · INFERRED: 112 edges (avg confidence: 0.89)
+- 1148 nodes · 1829 edges · 66 communities (63 shown, 2 thin omitted)
+- Extraction: 94% EXTRACTED · 6% INFERRED · 0% AMBIGUOUS · INFERRED: 111 edges (avg confidence: 0.89)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
@@ -24,7 +24,7 @@
 - ExchangeClient
 - _load_jsonc
 - technical_indicators.py
-- CryptoCouncilFlow
+- TestManagePortfolioStep
 - main.py
 - scout_tools.py
 - _run
@@ -62,7 +62,7 @@
 - test_panel_levels.py
 - TestEnvSeconds
 - test_panel_axes.py
-- model_validator
+- TestPortfolioPlanDTO
 - test_paper_ledger_pnl.py
 - Step-by-step tasks
 - council_crew.py
@@ -74,11 +74,12 @@
 - _fetch_ohlcv_coingecko
 - execution_base.py
 - Balance
-- TestFactory
+- test_execution_base.py
 - OrderResult
 - CryptoCouncilState
 - CoinOpportunity
 - OrderRequest
+- CryptoCouncilFlow
 
 ## God Nodes (most connected - your core abstractions)
 1. `AGENTS.md — CrewAI Reference for AI Coding Assistants` - 25 edges
@@ -107,7 +108,7 @@
 ## Import Cycles
 - None detected.
 
-## Communities (65 total, 2 thin omitted)
+## Communities (66 total, 2 thin omitted)
 
 ### Community 0 - "risk_tools.py"
 Cohesion: 0.13
@@ -130,8 +131,8 @@ Cohesion: 0.06
 Nodes (34): 1. Trending Coins (`trending_coins`), 2. Momentum Screener (`momentum_screener`), 3. Volatility and Tradeability, 4. New Listings (`new_listings`), ATR%, Composite Opportunity Score, Constraints, Data Sources and How to Use Them (+26 more)
 
 ### Community 5 - "portfolio_tools.py"
-Cohesion: 0.06
-Nodes (27): _portfolio_tools(), AllocatorOpportunity, _coin_id_of(), ExposurePosition, PortfolioExposureInput, PortfolioExposureTool, _position_of(), Any (+19 more)
+Cohesion: 0.07
+Nodes (26): _portfolio_tools(), AllocatorOpportunity, _coin_id_of(), ExposurePosition, PortfolioExposureInput, PortfolioExposureTool, _position_of(), Any (+18 more)
 
 ### Community 6 - "ExchangeClient"
 Cohesion: 0.16
@@ -145,9 +146,9 @@ Nodes (13): _load_jsonc(), Any, Path, Parse a JSONC file (JSON with // comments 
 Cohesion: 0.13
 Nodes (24): _technical_tools(), ATRInput, ATRTool, BollingerBandsInput, BollingerBandsTool, _closes(), _coingecko_id_to_symbol(), EMACrossInput (+16 more)
 
-### Community 9 - "CryptoCouncilFlow"
-Cohesion: 0.14
-Nodes (13): PortfolioAction, PortfolioPlan, BaseModel, model_validator, Single canonical DTO for scout output. CrewAI's output validation works against…, One per-coin rebalance action. One DTO, never two., Cap-aware rebalance plan. Single canonical DTO for portfolio output., ScoutOpportunity (+5 more)
+### Community 9 - "TestManagePortfolioStep"
+Cohesion: 0.19
+Nodes (9): PortfolioAction, PortfolioPlan, BaseModel, model_validator, Single canonical DTO for scout output. CrewAI's output validation works against…, One per-coin rebalance action. One DTO, never two., Cap-aware rebalance plan. Single canonical DTO for portfolio output., ScoutOpportunity (+1 more)
 
 ### Community 10 - "main.py"
 Cohesion: 0.13
@@ -190,8 +191,8 @@ Cohesion: 0.21
 Nodes (12): _cache_get(), _cache_put(), _check_symbol(), _error(), ExchangeBatchTickerInput, ExchangeMarketsInput, ExchangeOHLCInput, get_exchange_client() (+4 more)
 
 ### Community 20 - ".analyse_coins"
-Cohesion: 0.10
-Nodes (21): Exception, listen, _analyse_one_coin(), _analysis_workers(), _append_to_consolidated(), _build_report(), _extract_verdict(), _fmt_dur() (+13 more)
+Cohesion: 0.12
+Nodes (19): Exception, listen, _analyse_one_coin(), _analysis_workers(), _append_to_consolidated(), _build_report(), _extract_verdict(), _fmt_dur() (+11 more)
 
 ### Community 21 - "test_panel_fills.py"
 Cohesion: 0.09
@@ -314,8 +315,8 @@ Cohesion: 0.14
 Nodes (12): kickoff(), _parse_inputs(), Parse CLI arguments into Flow inputs. Accepted flags: --account-size <float>…, Primary entry point — starts the continuous Flow scheduler., Deterministic ATR-based stop/take (pure math, no network). 0.5x ATR stop and 1x…, _risk_levels_for(), Deterministic backfill helper in main.py (pure math, no network)., TestRiskLevelsFor (+4 more)
 
 ### Community 54 - "ExecutionClient"
-Cohesion: 0.14
-Nodes (7): ExecutionClient, Any, Abstract base for order placement and account state on a venue. Concrete…, Return tick/lot/min-notional for a symbol when the venue exposes it. Default:…, Release any held resources. Safe to call more than once., T, TestAbstractness
+Cohesion: 0.11
+Nodes (9): ExecutionClient, Any, Abstract base for order placement and account state on a venue. Concrete…, Return balances, optionally limited to ``assets`` (upper-case)., Return executed trades, newest-last, optionally since an epoch-ms watermark.…, Return tick/lot/min-notional for a symbol when the venue exposes it. Default:…, Release any held resources. Safe to call more than once., T (+1 more)
 
 ### Community 55 - "_writer_body"
 Cohesion: 0.23
@@ -334,12 +335,12 @@ Cohesion: 0.13
 Nodes (19): _ClientFactory, RuntimeError, ExecutionError, ExecutionHalted, get_execution_client(), get_execution_mode(), _load_builtin_clients(), OrderSide (+11 more)
 
 ### Community 59 - "Balance"
-Cohesion: 0.21
-Nodes (8): Balance, Fill, BaseModel, Account balance for a single asset., One executed trade. Fees are only knowable post-fill., Return balances, optionally limited to ``assets`` (upper-case)., Return executed trades, newest-last, optionally since an epoch-ms watermark.…, TestBalanceAndFill
+Cohesion: 0.18
+Nodes (7): Balance, Fill, BaseModel, model_validator, Account balance for a single asset., One executed trade. Fees are only knowable post-fill., TestBalanceAndFill
 
-### Community 60 - "TestFactory"
-Cohesion: 0.21
-Nodes (4): _make_factory(), Tests for the abstract execution interface (tools/execution_base.py). Slices:…, The interface must not depend on any concrete client existing., TestFactory
+### Community 60 - "test_execution_base.py"
+Cohesion: 0.16
+Nodes (6): _DummyClient, _make_factory(), Tests for the abstract execution interface (tools/execution_base.py). Slices:…, Not a real ExecutionClient — only used to prove registry dispatch., The interface must not depend on any concrete client existing., TestFactory
 
 ### Community 61 - "OrderResult"
 Cohesion: 0.16
@@ -354,23 +355,27 @@ Cohesion: 0.27
 Nodes (4): CoinOpportunity, model_validator, Single canonical DTO for scout output consumed by the Flow. Same shape as…, TestCoinOpportunity
 
 ### Community 64 - "OrderRequest"
-Cohesion: 0.36
+Cohesion: 0.39
 Nodes (3): OrderRequest, A venue-agnostic order intent. Exactly one of ``qty`` (base amount) or…, TestOrderRequest
+
+### Community 65 - "CryptoCouncilFlow"
+Cohesion: 0.25
+Nodes (6): CryptoCouncilFlow, plot(), Generate a flow diagram HTML file., Three-step CrewAI Flow: run_scout — market_scout produces a ranked coin list…, Run CouncilScoutCrew to refresh the opportunity list. Called once at startup…, start
 
 ## Knowledge Gaps
 - **221 isolated node(s):** `crypto_council_flow`, `OrderSide`, `OrderType`, `OrderStatus`, `Goal` (+216 more)
-  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 521 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 523 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
 - **2 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `test_backtest_real_flow_full()` connect `test_backtest_real_flow.py` to `_extract_scout_items`, `CryptoCouncilFlow`?**
+- **Why does `test_backtest_real_flow_full()` connect `test_backtest_real_flow.py` to `_extract_scout_items`, `TestManagePortfolioStep`, `CryptoCouncilFlow`?**
   _High betweenness centrality (0.045) - this node is a cross-community bridge._
-- **Why does `CouncilPortfolioCrew` connect `CouncilAnalysisCrew` to `CryptoCouncilFlow`, `main.py`, `council_crew.py`, `portfolio_tools.py`?**
-  _High betweenness centrality (0.042) - this node is a cross-community bridge._
+- **Why does `CouncilPortfolioCrew` connect `CouncilAnalysisCrew` to `CryptoCouncilFlow`, `main.py`, `council_crew.py`?**
+  _High betweenness centrality (0.040) - this node is a cross-community bridge._
 - **Why does `CouncilAnalysisCrew` connect `CouncilAnalysisCrew` to `main.py`, `council_crew.py`, `.analyse_coins`?**
-  _High betweenness centrality (0.036) - this node is a cross-community bridge._
+  _High betweenness centrality (0.035) - this node is a cross-community bridge._
 - **Are the 7 inferred relationships involving `CoinOpportunity` (e.g. with `_flow_with()` and `test_to_analyse_cap()`) actually correct?**
   _`CoinOpportunity` has 7 INFERRED edges - model-reasoned connections that need verification._
 - **Are the 7 inferred relationships involving `_run()` (e.g. with `test_cycle_lock_allows_sequential_execution()` and `test_cycle_lock_prevents_concurrent_execution()`) actually correct?**

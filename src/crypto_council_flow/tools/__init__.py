@@ -39,6 +39,17 @@ from crypto_council_flow.tools.portfolio_tools import (
     PortfolioExposureTool,
     RebalanceAllocatorTool,
 )
+from crypto_council_flow.tools.execution_base import (
+    ExecutionClient,
+    ExecutionError,
+    ExecutionHalted,
+    Balance,
+    OrderRequest,
+    OrderResult,
+    Fill,
+    get_execution_client,
+    get_execution_mode,
+)
 
 __all__ = [
     # Technical analysis
@@ -70,4 +81,14 @@ __all__ = [
     # Portfolio management (paper)
     "PortfolioExposureTool",
     "RebalanceAllocatorTool",
+    # Execution (abstract, exchange-agnostic)
+    "ExecutionClient",
+    "ExecutionError",
+    "ExecutionHalted",
+    "Balance",
+    "OrderRequest",
+    "OrderResult",
+    "Fill",
+    "get_execution_client",
+    "get_execution_mode",
 ]
