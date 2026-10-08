@@ -40,6 +40,7 @@ from __future__ import annotations
 import json
 import os
 import time
+from pathlib import Path
 from decimal import Decimal, InvalidOperation, ROUND_DOWN, ROUND_HALF_UP
 from typing import Any
 
@@ -670,8 +671,8 @@ class NobitexExecutionClient(ExecutionClient):
                 dst = str(t.get("dstCurrency") or "").upper()
                 market = str(t.get("market") or f"{src}-{dst}").upper()
                 # Fee currency: Nobitex typically charges in the RECEIVED currency
-                # (dst for SELL, src for BUY). We label conservatively with dst
-                # and a note; Phase 7 live verification must confirm.
+                # (dst for SELL, src for BUY). This is a heuristic, not a
+                # documented guarantee — Phase 7 live verification must confirm.
                 fee_currency = dst if t.get("type", "").lower() == OrderSide.SELL else src
                 fills.append(
                     Fill(
@@ -697,6 +698,249 @@ class NobitexExecutionClient(ExecutionClient):
                 exchange=self.name,
             )
         return fills
+
+    # -- live plan application (Phase 4) ------------------------------------
+
+    def apply_plan(
+        self,
+        plan: dict[str, Any],
+        risk_snapshot: dict[str, dict[str, float]],
+        account_size: float,
+        base_currency: str,
+        now_iso: str,
+        cycle: int,
+    ) -> dict[str, Any]:
+        """Translate plan deltas into real spot orders and summarize.
+
+        Same signature as ``PaperExecutionClient.apply_plan`` so ``main.py``
+        can call either client interchangeably. Each action's ``symbol``
+        (upper-case ticker, e.g. ``BTC``) is paired with this client's quote
+        currency (``BTC-RLS``); ``coin_id`` is only used to look up the
+        snapshot price for sizing.
+
+        Rules:
+          * market orders sized by quantity (no price guessing);
+          * ``EXECUTION_DRY_RUN=true`` builds the orders without POSTing and
+            logs nothing (rehearsals must not pollute the live audit log);
+          * dust deltas below ``EXECUTION_MIN_TRADE`` (default 10, same unit
+            as the allocator's ``min_trade``) are skipped, mirroring hold —
+            but 10 is a dust floor only: set it >= the venue's
+            minimum-notional (Nobitex ``/v2/options`` minimums are orders of
+            magnitude larger) or every live order is ``SmallOrder``-rejected;
+          * a placement failure is NEVER blind-retried — one attempt, then a
+            best-effort ``get_open_orders`` reconciliation note, then the
+            next coin (``client_order_id`` is advisory, not idempotent);
+          * P&L is honest about what live knows: ``realized_pnl`` is
+            ``-fee_total`` where each fill's fee is converted to quote (via
+            its own fill price, else the snapshot price). Fees with no
+            known currency/rate land in ``fee_unconverted`` and are
+            reported, never silently mixed into the total. A venue keeps no
+            cost basis, so no realized gains are fabricated;
+            ``unrealized_pnl`` is 0.0;
+          * ``open_positions``/``invested`` are pre-trade (a single balances
+            fetch); the quote asset (cash) is excluded from positions, and
+            each entry carries ``coin_id``/``asset``/``qty``/``price``/
+            ``market_value``. Post-trade truth comes from the fills plus
+            Phase 5 reconciliation. ``n_trades`` counts this cycle's fills
+            (paper's ``n_trades`` is cumulative ledger length). One JSONL
+            row per real (non-dry-run) cycle is appended to
+            ``EXECUTION_LOG_PATH`` (default
+            ``output/live_executions.jsonl``), best-effort.
+        """
+        snapshot = risk_snapshot or {}
+        since_ms = _iso_to_epoch_ms(now_iso)
+        try:
+            min_trade = max(0.0, float(os.getenv("EXECUTION_MIN_TRADE", "10") or 0))
+        except (TypeError, ValueError):
+            min_trade = 10.0
+        dry_run = str(os.getenv("EXECUTION_DRY_RUN", "")).strip().lower() in (
+            "1", "true", "yes", "on",
+        )
+
+        pre_balances = {
+            b.asset.upper(): float(b.free or 0.0) for b in self.get_balances()
+        }
+        coin_by_asset = {
+            str(a.get("symbol") or "").strip().upper(): str(a.get("coin_id") or "")
+            for a in (plan or {}).get("actions", [])
+            if isinstance(a, dict) and str(a.get("symbol") or "").strip()
+        }
+
+        orders: list[dict[str, Any]] = []
+        errors: list[dict[str, Any]] = []
+
+        for a in (plan or {}).get("actions", []):
+            if not isinstance(a, dict):
+                continue
+            coin_id = str(a.get("coin_id") or "")
+            base = str(a.get("symbol") or "").strip().upper()
+            venue_symbol = f"{base}-{self.quote_currency.upper()}" if base else ""
+            if not base:
+                errors.append({
+                    "coin_id": coin_id, "symbol": venue_symbol,
+                    "error": "skipped: no symbol — cannot translate coin_id to a venue pair",
+                })
+                continue
+            try:
+                target = float(a.get("target", 0) or 0)
+            except (TypeError, ValueError):
+                errors.append({
+                    "coin_id": coin_id, "symbol": venue_symbol,
+                    "error": f"skipped: non-numeric target {a.get('target')!r}",
+                })
+                continue
+            try:
+                px = float((snapshot.get(coin_id) or {}).get("current_price") or 0.0)
+            except (TypeError, ValueError):
+                px = 0.0
+            if px <= 0:
+                errors.append({
+                    "coin_id": coin_id, "symbol": venue_symbol,
+                    "error": "skipped: no snapshot price for sizing",
+                })
+                continue
+            current_qty = max(0.0, pre_balances.get(base, 0.0))
+            if target <= 0:
+                if current_qty <= 0:
+                    continue  # nothing live to close — not an error
+                side, qty = OrderSide.SELL, current_qty
+            else:
+                delta_qty = target / px - current_qty
+                if abs(delta_qty) * px < min_trade:
+                    continue  # dust -> hold, mirrors the allocator
+                side = OrderSide.BUY if delta_qty > 0 else OrderSide.SELL
+                qty = abs(delta_qty)
+            client_order_id = f"live-c{cycle}-{base}-{side}"[:32]
+            try:
+                request = OrderRequest(
+                    symbol=venue_symbol, side=side, type=OrderType.MARKET,
+                    qty=qty, client_order_id=client_order_id,
+                )
+            except Exception as exc:
+                errors.append({
+                    "coin_id": coin_id, "symbol": venue_symbol,
+                    "error": f"skipped: invalid order ({exc})",
+                })
+                continue
+            if dry_run:
+                orders.append({"dry_run": True, "coin_id": coin_id,
+                               **request.model_dump()})
+                continue
+            try:
+                result = self.place_order(request)
+            except ExecutionError as exc:
+                try:
+                    still_open = self.get_open_orders(symbol=venue_symbol)
+                    note = (f"{len(still_open)} open order(s) on {venue_symbol} "
+                            "after failure — reconcile before retrying")
+                except Exception:
+                    note = "reconciliation query also failed"
+                errors.append({
+                    "coin_id": coin_id, "symbol": venue_symbol,
+                    "error": str(exc), "reconcile": note,
+                })
+                continue
+            orders.append({"coin_id": coin_id, **result.model_dump()})
+
+        fills: list[dict[str, Any]] = []
+        fills_note: str | None = None
+        fills_since = (since_ms - 30_000) if since_ms is not None else None
+        if fills_since is not None:
+            fills_since = max(0, fills_since)
+        if not dry_run:
+            try:
+                # Skew guard: the cycle timestamp is stamped just before this
+                # call, so fills timestamped a few seconds earlier (clock
+                # skew, same-second granularity) must not be excluded.
+                fills = [
+                    f.model_dump() for f in self.get_fills(since=fills_since)
+                ]
+            except ExecutionError as exc:
+                fills_note = str(exc)
+        quote = self.quote_currency.upper()
+        fee_total = 0.0
+        fee_unconverted: list[dict[str, Any]] = []
+        for f in fills:
+            try:
+                raw_fee = float(f.get("fee") or 0.0)
+            except (TypeError, ValueError):
+                raw_fee = 0.0
+            if raw_fee == 0:
+                continue
+            fee_ccy = str(f.get("fee_currency") or "").upper()
+            if fee_ccy == quote:
+                fee_total += raw_fee
+                continue
+            base_leg = str(f.get("symbol") or "").upper().split("-")[0]
+            try:
+                fill_px = float(f.get("price") or 0.0)
+            except (TypeError, ValueError):
+                fill_px = 0.0
+            if fee_ccy and fee_ccy == base_leg and fill_px > 0:
+                fee_total += raw_fee * fill_px
+            else:
+                fee_unconverted.append({
+                    "trade_id": f.get("trade_id"), "order_id": f.get("order_id"),
+                    "fee": raw_fee, "fee_currency": f.get("fee_currency"),
+                    "note": "fee currency unknown or unpriced — excluded from fee_total",
+                })
+        invested = 0.0
+        open_positions: list[dict[str, Any]] = []
+        for asset, qty in pre_balances.items():
+            if qty <= 0:
+                continue
+            if asset == quote:
+                continue  # cash is not a position (paper parity)
+            cid = coin_by_asset.get(asset, "")
+            try:
+                asset_px = float((snapshot.get(cid) or {}).get("current_price") or 0.0)
+            except (TypeError, ValueError):
+                asset_px = 0.0
+            market_value = qty * asset_px if asset_px > 0 else 0.0
+            invested += market_value
+            # No avg_cost / unrealized_pnl: the venue keeps no cost basis,
+            # so unlike paper we report price + market_value only.
+            open_positions.append({
+                "coin_id": cid, "asset": asset, "qty": qty,
+                "price": asset_px, "market_value": market_value,
+            })
+
+        account = float(account_size or 0.0)
+        summary: dict[str, Any] = {
+            "mode": "live",
+            "exchange": self.name,
+            "dry_run": dry_run,
+            "cycle": cycle,
+            "ts": now_iso,
+            "base_currency": base_currency,
+            "orders": orders,
+            "errors": errors,
+            # This cycle's fills only — paper's `n_trades` is cumulative
+            # ledger length, so the two are not comparable.
+            "n_trades": len(fills),
+            # Quote-currency fee total. Fees whose currency could not be
+            # priced are reported, never silently mixed in.
+            "fee_total": fee_total,
+            "fee_currency": quote,
+            "fee_unconverted": fee_unconverted,
+            "realized_pnl": -fee_total,
+            "unrealized_pnl": 0.0,
+            "total_pnl": -fee_total,
+            "equity": account - fee_total,
+            "invested": invested,
+            "open_positions": open_positions,
+        }
+        if fills_note:
+            summary["fills_note"] = fills_note
+        if not dry_run:
+            try:
+                log_path = Path(os.getenv("EXECUTION_LOG_PATH", "output/live_executions.jsonl"))
+                log_path.parent.mkdir(parents=True, exist_ok=True)
+                with log_path.open("a", encoding="utf-8") as fh:
+                    fh.write(json.dumps(summary, ensure_ascii=False) + "\n")
+            except Exception:
+                pass
+        return summary
 
 
 register_execution_client("nobitex", NobitexExecutionClient)

@@ -872,10 +872,11 @@ def _update_paper_ledger(
     Phase 2: the ledger logic now lives in ``PaperExecutionClient`` so paper is
     just one implementation behind the ``ExecutionClient`` interface. The
     selected execution mode chooses the client (default paper). In ``live``
-    mode this function deliberately fails loudly (``NotImplementedError``)
-    until Phase 4 wires real order translation — no paper-style fills are
-    ever produced against a live venue. ``EXECUTION_MODE=halted`` raises
-    ``ExecutionHalted`` from the factory.
+    mode the client translates plan deltas into real spot orders
+    (``NobitexExecutionClient.apply_plan``, Phase 4); clients without
+    ``apply_plan`` still fail loudly (``NotImplementedError``) — no
+    paper-style fills are ever produced against a live venue.
+    ``EXECUTION_MODE=halted`` raises ``ExecutionHalted`` from the factory.
 
     Prices come from the risk snapshot (cached OHLC close) — zero new network
     calls. Positions are tracked as {coin_id: {qty, avg_cost}} in
