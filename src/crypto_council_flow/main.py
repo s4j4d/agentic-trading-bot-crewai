@@ -869,147 +869,65 @@ def _update_paper_ledger(
 ) -> dict[str, Any]:
     """Fill the plan against the paper ledger using current prices.
 
-    Prices come from the risk snapshot (cached OHLC close) — zero new
-    network calls. Positions are tracked as {coin_id: {qty, avg_cost}} in
-    paper_positions.json; trades append to paper_ledger.json. Returns a
-    P&L summary dict for the snapshot/panel.
+    Phase 2: the ledger logic now lives in ``PaperExecutionClient`` so paper is
+    just one implementation behind the ``ExecutionClient`` interface. The
+    selected execution mode chooses the client (default paper). In ``live``
+    mode this function deliberately fails loudly (``NotImplementedError``)
+    until Phase 4 wires real order translation — no paper-style fills are
+    ever produced against a live venue. ``EXECUTION_MODE=halted`` raises
+    ``ExecutionHalted`` from the factory.
+
+    Prices come from the risk snapshot (cached OHLC close) — zero new network
+    calls. Positions are tracked as {coin_id: {qty, avg_cost}} in
+    paper_positions.json; trades append to paper_ledger.json.
     """
-    positions: dict[str, dict[str, float]] = {}
-    if POSITIONS_PATH.exists():
-        try:
-            positions = json.loads(POSITIONS_PATH.read_text(encoding="utf-8"))
-        except Exception:
-            positions = {}
-    ledger: list[dict[str, Any]] = []
-    if LEDGER_PATH.exists():
-        try:
-            ledger = json.loads(LEDGER_PATH.read_text(encoding="utf-8"))
-        except Exception:
-            ledger = []
-
-    realized = 0.0
-    trades: list[dict[str, Any]] = []
-    # Close positions no longer in the plan at current price.
-    plan_targets = {
-        a.get("coin_id"): float(a.get("target", 0) or 0)
-        for a in plan.get("actions", [])
-    }
-    for coin_id in list(positions.keys()):
-        target = plan_targets.get(coin_id, 0.0)
-        if target <= 0:
-            pos = positions[coin_id]
-            px = (risk_snapshot.get(coin_id) or {}).get("current_price")
-            if not px:
-                # No price this cycle (429 / thin data). Realizing at cost is
-                # wrong, but DROPPING the position destroys cost basis and its
-                # P&L permanently -- the book silently shrinks and equity
-                # freezes. Keep the position so the next priced cycle closes
-                # it properly; only a real target > 0 can revive it.
-                continue
-            positions.pop(coin_id, None)
-            if pos.get("qty"):
-                proceeds = pos["qty"] * px
-                cost = pos["qty"] * pos["avg_cost"]
-                realized += proceeds - cost
-                trades.append({
-                    "ts": now_iso, "cycle": cycle, "coin_id": coin_id,
-                    "side": "close", "qty": pos["qty"], "price": px,
-                    "amount": proceeds, "realized_pnl": proceeds - cost,
-                })
-            else:
-                positions.pop(coin_id, None)
-                trades.append({
-                    "ts": now_iso, "cycle": cycle, "coin_id": coin_id,
-                    "side": "close", "qty": pos.get("qty", 0),
-                    "price": px, "amount": 0.0, "realized_pnl": None,
-                    "note": "zero-quantity position closed",
-                })
-
-    # Apply plan deltas at current price.
-    for a in plan.get("actions", []):
-        coin_id = a.get("coin_id")
-        if not coin_id:
-            continue
-        target = float(a.get("target", 0) or 0)
-        px = (risk_snapshot.get(coin_id) or {}).get("current_price")
-        if not px:
-            continue
-        qty_target = target / px
-        # A plan action that targets 0 is a close, handled in the close pass
-        # above; setdefault here would resurrect a phantom {qty: 0} position
-        # that then leaks into every future cycle's book.
-        if target <= 0:
-            continue
-        pos = positions.setdefault(coin_id, {"qty": 0.0, "avg_cost": 0.0})
-        qty_now = pos["qty"]
-        delta_qty = qty_target - qty_now
-        if abs(delta_qty) * px < 1e-9:
-            continue
-        side = "buy" if delta_qty > 0 else "sell"
-        # Ledger rows record a positive traded size/amount on both sides and
-        # `side` carries the direction. Selling used to store a negative qty
-        # and amount, which made a profitable partial sell realize the wrong
-        # sign of P&L downstream.
-        traded_qty = abs(delta_qty)
-        trade = {
-            "ts": now_iso, "cycle": cycle, "coin_id": coin_id,
-            "side": side, "qty": traded_qty, "price": px,
-            "amount": traded_qty * px,
-        }
-        if side == "buy":
-            new_qty = qty_now + delta_qty
-            pos["avg_cost"] = (
-                (qty_now * pos["avg_cost"] + delta_qty * px) / new_qty
-                if new_qty else 0.0
-            )
-            pos["qty"] = new_qty
-        else:
-            trade["realized_pnl"] = traded_qty * (px - pos["avg_cost"])
-            realized += trade["realized_pnl"]
-            pos["qty"] = qty_now + delta_qty
-            if pos["qty"] <= 1e-9:
-                positions.pop(coin_id, None)
-        trades.append(trade)
-
-    # Unrealized P&L on remaining positions.
-    unrealized = 0.0
-    open_positions: list[dict[str, Any]] = []
-    for coin_id, pos in positions.items():
-        px = (risk_snapshot.get(coin_id) or {}).get("current_price")
-        if not px or not pos.get("qty"):
-            continue
-        market = pos["qty"] * px
-        cost = pos["qty"] * pos["avg_cost"]
-        upl = market - cost
-        unrealized += upl
-        open_positions.append({
-            "coin_id": coin_id, "qty": pos["qty"], "avg_cost": pos["avg_cost"],
-            "price": px, "market_value": market, "unrealized_pnl": upl,
-        })
-
-    ledger.extend(trades)
-    LEDGER_PATH.write_text(json.dumps(ledger, ensure_ascii=False, indent=2), encoding="utf-8")
-    POSITIONS_PATH.write_text(json.dumps(positions, ensure_ascii=False, indent=2), encoding="utf-8")
-
-    total_realized = sum(
-        t.get("realized_pnl") or 0.0 for t in ledger if t.get("realized_pnl") is not None
+    client = _execution_client_for_ledger(base_currency)
+    apply_plan = getattr(client, "apply_plan", None)
+    if apply_plan is None:
+        raise NotImplementedError(
+            f"execution client {client.name!r} does not implement apply_plan; "
+            "live order translation lands in a later phase"
+        )
+    return apply_plan(
+        plan=plan,
+        risk_snapshot=risk_snapshot,
+        account_size=account_size,
+        base_currency=base_currency,
+        now_iso=now_iso,
+        cycle=cycle,
     )
-    invested = sum(p["market_value"] for p in open_positions)
-    # Equity = cash + market value + P&L, and cash is (account_size - invested),
-    # so `invested` cancels: equity = account_size + realized + unrealized.
-    # Subtracting `invested` here (the old formula) double-counted the money
-    # sitting in open positions and understated equity by exactly `invested`
-    # the moment any capital was deployed.
-    equity = account_size + total_realized + unrealized
-    return {
-        "realized_pnl": total_realized,
-        "unrealized_pnl": unrealized,
-        "total_pnl": total_realized + unrealized,
-        "equity": equity,
-        "invested": invested,
-        "open_positions": open_positions,
-        "n_trades": len(ledger),
-    }
+
+
+def _execution_client_for_ledger(base_currency: str | None = None):
+    """Return the execution client used for the plan-fill step.
+
+    Default (paper) returns a ``PaperExecutionClient`` bound to this module's
+    ``LEDGER_PATH``/``POSITIONS_PATH`` so monkeypatching those in tests keeps
+    working. A non-paper ``EXECUTION_MODE`` is routed through the abstract
+    factory, which raises ``ExecutionHalted`` for the kill switch and
+    ``ExecutionError`` when no live client is registered — both fail loudly
+    rather than silently falling back to paper.
+    """
+    from crypto_council_flow.tools.execution_base import (
+        MODE_PAPER,
+        get_execution_client,
+        get_execution_mode,
+    )
+
+    if get_execution_mode() == MODE_PAPER:
+        from crypto_council_flow.tools.execution_paper import PaperExecutionClient
+
+        return PaperExecutionClient(
+            ledger_path=LEDGER_PATH,
+            positions_path=POSITIONS_PATH,
+            quote_currency=base_currency or base_currency_hint(),
+        )
+    return get_execution_client()
+
+
+def base_currency_hint() -> str:
+    """Quote currency for the execution client, from env (default usd)."""
+    return os.getenv("EXECUTION_QUOTE", DEFAULT_BASE_CURRENCY)
 
 
 def _regenerate_portfolio_panel() -> None:

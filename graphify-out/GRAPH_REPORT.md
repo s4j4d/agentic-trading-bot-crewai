@@ -1,16 +1,16 @@
 # Graph Report - crypto_council_flow  (2026-10-08)
 
 ## Corpus Check
-- 48 files · ~62,772 words
+- 52 files · ~68,519 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 1146 nodes · 1828 edges · 65 communities (62 shown, 2 thin omitted)
-- Extraction: 94% EXTRACTED · 6% INFERRED · 0% AMBIGUOUS · INFERRED: 112 edges (avg confidence: 0.89)
+- 1280 nodes · 2216 edges · 67 communities (65 shown, 1 thin omitted)
+- Extraction: 92% EXTRACTED · 8% INFERRED · 0% AMBIGUOUS · INFERRED: 180 edges (avg confidence: 0.91)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `761a39d4`
+- Built from commit: `f50888aa`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -62,7 +62,7 @@
 - test_panel_levels.py
 - TestEnvSeconds
 - test_panel_axes.py
-- model_validator
+- PaperExecutionClient
 - test_paper_ledger_pnl.py
 - Step-by-step tasks
 - council_crew.py
@@ -71,26 +71,28 @@
 - ExecutionClient
 - _writer_body
 - _extract_scout_items
-- _fetch_ohlcv_coingecko
-- execution_base.py
+- NobitexExecutionClient
+- ExecutionError
 - Balance
 - TestFactory
 - OrderResult
 - CryptoCouncilState
 - CoinOpportunity
+- execution_nobitex.py
 - OrderRequest
+- TestPortfolioPlanDTO
 
 ## God Nodes (most connected - your core abstractions)
-1. `AGENTS.md — CrewAI Reference for AI Coding Assistants` - 25 edges
-2. `CoinOpportunity` - 24 edges
-3. `_run()` - 21 edges
-4. `build()` - 19 edges
-5. `ExecutionClient` - 19 edges
-6. `_load_jsonc()` - 18 edges
-7. `CouncilAnalysisCrew` - 17 edges
-8. `CouncilPortfolioCrew` - 16 edges
-9. `CryptoCouncilFlow` - 16 edges
-10. `CouncilScoutCrew` - 15 edges
+1. `OrderRequest` - 35 edges
+2. `NobitexExecutionClient` - 33 edges
+3. `_client()` - 28 edges
+4. `OrderResult` - 26 edges
+5. `PaperExecutionClient` - 26 edges
+6. `AGENTS.md — CrewAI Reference for AI Coding Assistants` - 25 edges
+7. `CoinOpportunity` - 24 edges
+8. `ExecutionError` - 24 edges
+9. `ExecutionClient` - 23 edges
+10. `_run()` - 21 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `test_defaults_are_small_and_short()` --uses--> `CryptoCouncilState`  [INFERRED]
@@ -107,11 +109,11 @@
 ## Import Cycles
 - None detected.
 
-## Communities (65 total, 2 thin omitted)
+## Communities (67 total, 1 thin omitted)
 
 ### Community 0 - "risk_tools.py"
-Cohesion: 0.13
-Nodes (16): field_validator, _risk_tools(), AssetCorrelationTool, CorrelationInput, _fetch_daily_closes(), LiquidationPriceInput, LiquidationPriceTool, PortfolioVaRTool (+8 more)
+Cohesion: 0.18
+Nodes (10): field_validator, CorrelationInput, _fetch_daily_closes(), LiquidationPriceInput, PositionSizingInput, BaseModel, model_validator, ndarray (+2 more)
 
 ### Community 1 - "CouncilAnalysisCrew"
 Cohesion: 0.06
@@ -130,8 +132,8 @@ Cohesion: 0.06
 Nodes (34): 1. Trending Coins (`trending_coins`), 2. Momentum Screener (`momentum_screener`), 3. Volatility and Tradeability, 4. New Listings (`new_listings`), ATR%, Composite Opportunity Score, Constraints, Data Sources and How to Use Them (+26 more)
 
 ### Community 5 - "portfolio_tools.py"
-Cohesion: 0.06
-Nodes (27): _portfolio_tools(), AllocatorOpportunity, _coin_id_of(), ExposurePosition, PortfolioExposureInput, PortfolioExposureTool, _position_of(), Any (+19 more)
+Cohesion: 0.08
+Nodes (24): _portfolio_tools(), AllocatorOpportunity, _coin_id_of(), ExposurePosition, PortfolioExposureInput, PortfolioExposureTool, _position_of(), Any (+16 more)
 
 ### Community 6 - "ExchangeClient"
 Cohesion: 0.16
@@ -142,16 +144,16 @@ Cohesion: 0.15
 Nodes (13): _load_jsonc(), Any, Path, Parse a JSONC file (JSON with // comments and trailing commas). The…, Path, Unit tests for the _load_jsonc() helper in council_crew.py. All tests operate…, The actual agents.jsonc in the project can be loaded without error., Each agent in agents.jsonc has the required role, goal, backstory keys. (+5 more)
 
 ### Community 8 - "technical_indicators.py"
-Cohesion: 0.13
-Nodes (24): _technical_tools(), ATRInput, ATRTool, BollingerBandsInput, BollingerBandsTool, _closes(), _coingecko_id_to_symbol(), EMACrossInput (+16 more)
+Cohesion: 0.10
+Nodes (30): Response, _technical_tools(), ATRInput, ATRTool, BollingerBandsInput, BollingerBandsTool, _closes(), _coingecko_id_to_symbol() (+22 more)
 
 ### Community 9 - "CryptoCouncilFlow"
 Cohesion: 0.14
 Nodes (13): PortfolioAction, PortfolioPlan, BaseModel, model_validator, Single canonical DTO for scout output. CrewAI's output validation works against…, One per-coin rebalance action. One DTO, never two., Cap-aware rebalance plan. Single canonical DTO for portfolio output., ScoutOpportunity (+5 more)
 
 ### Community 10 - "main.py"
-Cohesion: 0.13
-Nodes (21): _apply_max_hold(), _apply_sl_tp_hits(), _atr_snapshot_for(), _env_seconds(), _extract_portfolio_plan(), Any, datetime, Run the stdlib panel script after each portfolio cycle. Best-effort. (+13 more)
+Cohesion: 0.12
+Nodes (23): _apply_max_hold(), _apply_sl_tp_hits(), _atr_snapshot_for(), base_currency_hint(), _env_seconds(), _extract_portfolio_plan(), Any, datetime (+15 more)
 
 ### Community 11 - "scout_tools.py"
 Cohesion: 0.24
@@ -266,8 +268,8 @@ Cohesion: 0.67
 Nodes (3): Hierarchical, Process Types, Sequential (default)
 
 ### Community 40 - "sentiment_tools.py"
-Cohesion: 0.15
-Nodes (14): CommunitySentimentInput, CryptoNewsInput, _currency_matches(), FearGreedInput, _fetch_rss_items(), _headline_sentiment(), MarketDominanceInput, BaseModel (+6 more)
+Cohesion: 0.12
+Nodes (20): _sentiment_tools(), CommunitySentimentInput, CommunitySentimentTool, CryptoNewsInput, CryptoNewsTool, _currency_matches(), FearGreedIndexTool, FearGreedInput (+12 more)
 
 ### Community 42 - "_backfill_risk_levels"
 Cohesion: 0.19
@@ -293,6 +295,10 @@ Nodes (10): parametrize, Tests for the scheduler cadence knobs exposed as env va
 Cohesion: 0.10
 Nodes (22): _load_panel(), panel(), fixture, parametrize, Tests for the portfolio panel chart (scripts/portfolio_panel.py). Covers the…, Regression: `or account` made a genuine equity of 0.0 fall back to the full…, Regression: pre-ledger rows plotted account_size in the chart but 0 in the…, Regression: with a 60-row window the baseline silently re-based to hist[0]; it… (+14 more)
 
+### Community 48 - "PaperExecutionClient"
+Cohesion: 0.11
+Nodes (17): _ClientFactory, OrderStatus, Register a client factory under ``name`` (matched against EXECUTION_MODE for…, register_execution_client(), _fee_bps_from_env(), _iso_to_epoch_ms(), PaperExecutionClient, Any (+9 more)
+
 ### Community 49 - "test_paper_ledger_pnl.py"
 Cohesion: 0.10
 Nodes (36): Round a requested day-count up to the nearest CoinGecko-accepted value. The…, _valid_coingecko_days(), ledger(), _open(), _plan(), _positions(), fixture, parametrize (+28 more)
@@ -303,7 +309,7 @@ Nodes (14): Architecture / proposed approach, Current context / assumptions, Goa
 
 ### Community 51 - "council_crew.py"
 Cohesion: 0.15
-Nodes (23): Crypto Council Crew Orchestrates four specialist agents: - market_scout — scans…, _scout_tools(), _sentiment_tools(), ExchangeBatchTickerTool, ExchangeMarketsTool, ExchangeOHLCTool, BaseTool, Fetch all tradeable markets from the configured exchange. (+15 more)
+Nodes (23): Crypto Council Crew Orchestrates four specialist agents: - market_scout — scans…, _risk_tools(), _scout_tools(), ExchangeBatchTickerTool, ExchangeMarketsTool, ExchangeOHLCTool, BaseTool, Fetch all tradeable markets from the configured exchange. (+15 more)
 
 ### Community 52 - "test_panel_cycles.py"
 Cohesion: 0.17
@@ -314,8 +320,8 @@ Cohesion: 0.14
 Nodes (12): kickoff(), _parse_inputs(), Parse CLI arguments into Flow inputs. Accepted flags: --account-size <float>…, Primary entry point — starts the continuous Flow scheduler., Deterministic ATR-based stop/take (pure math, no network). 0.5x ATR stop and 1x…, _risk_levels_for(), Deterministic backfill helper in main.py (pure math, no network)., TestRiskLevelsFor (+4 more)
 
 ### Community 54 - "ExecutionClient"
-Cohesion: 0.14
-Nodes (7): ExecutionClient, Any, Abstract base for order placement and account state on a venue. Concrete…, Return tick/lot/min-notional for a symbol when the venue exposes it. Default:…, Release any held resources. Safe to call more than once., T, TestAbstractness
+Cohesion: 0.09
+Nodes (11): ExecutionClient, Any, Abstract base for order placement and account state on a venue. Concrete…, Return balances, optionally limited to ``assets`` (upper-case)., Submit an order. Raises ``ExecutionError`` on rejection/failure.…, Return one order's current state, or None if the venue has no record of it…, Return executed trades, newest-last, optionally since an epoch-ms watermark.…, Return tick/lot/min-notional for a symbol when the venue exposes it. Default:… (+3 more)
 
 ### Community 55 - "_writer_body"
 Cohesion: 0.23
@@ -325,25 +331,25 @@ Nodes (7): The writer side of the cycle-marker contract. `portfolio_panel._main_
 Cohesion: 0.24
 Nodes (10): ScoutShortlist, _extract_scout_items(), Best-effort extraction of opportunity dicts from raw scout text. Handles the…, Scout structured-output wiring: pydantic path + raw fallback extractor., The zcash-shaped item from the failed run must validate (int score)., test_extractor_handles_envelope(), test_extractor_handles_fenced_bare_array(), test_extractor_returns_empty_on_prose() (+2 more)
 
-### Community 57 - "_fetch_ohlcv_coingecko"
-Cohesion: 0.33
-Nodes (6): Response, _fetch_ohlcv_coingecko(), Any, Fetch OHLCV from CoinGecko., GET with a minimum gap between CoinGecko calls (rate-limit guard)., _throttled_get()
+### Community 57 - "NobitexExecutionClient"
+Cohesion: 0.12
+Nodes (17): _iso_to_epoch_ms(), NobitexExecutionClient, Any, Parse an ISO-8601 timestamp to epoch milliseconds (best effort)., Live spot execution on Nobitex (apiv2), token-authenticated. Configuration (all…, Call the venue, normalise every failure into ``ExecutionError``.…, Translate ``symbol`` into Nobitex's (srcCurrency, dstCurrency) pair. Accepts…, Local precision/min-notional for a symbol. Nobitex does not publish per-pair… (+9 more)
 
-### Community 58 - "execution_base.py"
-Cohesion: 0.13
-Nodes (19): _ClientFactory, RuntimeError, ExecutionError, ExecutionHalted, get_execution_client(), get_execution_mode(), _load_builtin_clients(), OrderSide (+11 more)
+### Community 58 - "ExecutionError"
+Cohesion: 0.16
+Nodes (17): RuntimeError, _execution_client_for_ledger(), Return the execution client used for the plan-fill step. Default (paper)…, ExecutionError, ExecutionHalted, get_execution_client(), get_execution_mode(), _load_builtin_clients() (+9 more)
 
 ### Community 59 - "Balance"
-Cohesion: 0.21
-Nodes (8): Balance, Fill, BaseModel, Account balance for a single asset., One executed trade. Fees are only knowable post-fill., Return balances, optionally limited to ``assets`` (upper-case)., Return executed trades, newest-last, optionally since an epoch-ms watermark.…, TestBalanceAndFill
+Cohesion: 0.18
+Nodes (7): Balance, Fill, BaseModel, model_validator, Account balance for a single asset., One executed trade. Fees are only knowable post-fill., TestBalanceAndFill
 
 ### Community 60 - "TestFactory"
 Cohesion: 0.21
 Nodes (4): _make_factory(), Tests for the abstract execution interface (tools/execution_base.py). Slices:…, The interface must not depend on any concrete client existing., TestFactory
 
 ### Community 61 - "OrderResult"
-Cohesion: 0.16
-Nodes (7): OrderResult, Normalized outcome of a placed/cancelled/queried order., Submit an order. Raises ``ExecutionError`` on rejection/failure.…, Cancel a live order and return its terminal state., Return one order's current state, or None if the venue has no record of it…, List live (unfilled/partially filled) orders., TestOrderResult
+Cohesion: 0.14
+Nodes (8): OrderResult, Normalized outcome of a placed/cancelled/queried order., Cancel a live order and return its terminal state., List live (unfilled/partially filled) orders., Paper orders fill instantly, so nothing is ever live to cancel., Paper keeps no resting orders; nothing to look up., Paper never has resting orders (all fills are immediate)., TestOrderResult
 
 ### Community 62 - "CryptoCouncilState"
 Cohesion: 0.24
@@ -353,29 +359,37 @@ Nodes (5): CryptoCouncilState, BaseModel, Persistent Flow state passed between s
 Cohesion: 0.27
 Nodes (4): CoinOpportunity, model_validator, Single canonical DTO for scout output consumed by the Flow. Same shape as…, TestCoinOpportunity
 
-### Community 64 - "OrderRequest"
-Cohesion: 0.36
-Nodes (3): OrderRequest, A venue-agnostic order intent. Exactly one of ``qty`` (base amount) or…, TestOrderRequest
+### Community 64 - "execution_nobitex.py"
+Cohesion: 0.20
+Nodes (9): Decimal, Session, _decimals_from_env(), _format_decimal(), _quantise(), Nobitex live execution client (Phase 3 of the paper->live plan). Implements the…, Render a Decimal without scientific notation or trailing zeros., Best-effort last trade price for a pair (used to size market buys). (+1 more)
+
+### Community 65 - "OrderRequest"
+Cohesion: 0.08
+Nodes (52): OrderRequest, OrderSide, OrderType, A venue-agnostic order intent. Exactly one of ``qty`` (base amount) or…, TestOrderRequest, _client(), FakeResponse, FakeSession (+44 more)
+
+### Community 66 - "TestPortfolioPlanDTO"
+Cohesion: 0.17
+Nodes (3): Tests for the portfolio manager: paper positions, exposure caps, rebalance.…, _StubResult, TestPortfolioPlanDTO
 
 ## Knowledge Gaps
-- **221 isolated node(s):** `crypto_council_flow`, `OrderSide`, `OrderType`, `OrderStatus`, `Goal` (+216 more)
-  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 521 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
-- **2 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **218 isolated node(s):** `crypto_council_flow`, `Goal`, `Current context / assumptions`, `Architecture / proposed approach`, `Task 0 — Confirm the time budget split (no code, 3 min)` (+213 more)
+  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 564 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+- **1 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `test_backtest_real_flow_full()` connect `test_backtest_real_flow.py` to `_extract_scout_items`, `CryptoCouncilFlow`?**
-  _High betweenness centrality (0.045) - this node is a cross-community bridge._
-- **Why does `CouncilPortfolioCrew` connect `CouncilAnalysisCrew` to `CryptoCouncilFlow`, `main.py`, `council_crew.py`, `portfolio_tools.py`?**
-  _High betweenness centrality (0.042) - this node is a cross-community bridge._
+- **Why does `PaperExecutionClient` connect `PaperExecutionClient` to `OrderRequest`, `main.py`, `council_crew.py`, `ExecutionClient`, `ExecutionError`, `Balance`, `OrderResult`?**
+  _High betweenness centrality (0.061) - this node is a cross-community bridge._
 - **Why does `CouncilAnalysisCrew` connect `CouncilAnalysisCrew` to `main.py`, `council_crew.py`, `.analyse_coins`?**
-  _High betweenness centrality (0.036) - this node is a cross-community bridge._
-- **Are the 7 inferred relationships involving `CoinOpportunity` (e.g. with `_flow_with()` and `test_to_analyse_cap()`) actually correct?**
-  _`CoinOpportunity` has 7 INFERRED edges - model-reasoned connections that need verification._
-- **Are the 7 inferred relationships involving `_run()` (e.g. with `test_cycle_lock_allows_sequential_execution()` and `test_cycle_lock_prevents_concurrent_execution()`) actually correct?**
-  _`_run()` has 7 INFERRED edges - model-reasoned connections that need verification._
-- **Are the 3 inferred relationships involving `ExecutionClient` (e.g. with `_make_factory()` and `TestAbstractness`) actually correct?**
-  _`ExecutionClient` has 3 INFERRED edges - model-reasoned connections that need verification._
-- **What connects `crypto_council_flow`, `OrderSide`, `OrderType` to the rest of the system?**
-  _221 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _High betweenness centrality (0.037) - this node is a cross-community bridge._
+- **Why does `CouncilScoutCrew` connect `CouncilAnalysisCrew` to `CryptoCouncilFlow`, `main.py`, `council_crew.py`, `.analyse_coins`, `_extract_scout_items`?**
+  _High betweenness centrality (0.037) - this node is a cross-community bridge._
+- **Are the 23 inferred relationships involving `OrderRequest` (e.g. with `NobitexExecutionClient` and `PaperExecutionClient`) actually correct?**
+  _`OrderRequest` has 23 INFERRED edges - model-reasoned connections that need verification._
+- **Are the 10 inferred relationships involving `NobitexExecutionClient` (e.g. with `Balance` and `ExecutionError`) actually correct?**
+  _`NobitexExecutionClient` has 10 INFERRED edges - model-reasoned connections that need verification._
+- **Are the 5 inferred relationships involving `OrderResult` (e.g. with `NobitexExecutionClient` and `PaperExecutionClient`) actually correct?**
+  _`OrderResult` has 5 INFERRED edges - model-reasoned connections that need verification._
+- **Are the 8 inferred relationships involving `PaperExecutionClient` (e.g. with `Balance` and `ExecutionError`) actually correct?**
+  _`PaperExecutionClient` has 8 INFERRED edges - model-reasoned connections that need verification._

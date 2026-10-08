@@ -50,6 +50,8 @@ from crypto_council_flow.tools.execution_base import (
     get_execution_client,
     get_execution_mode,
 )
+from crypto_council_flow.tools.execution_paper import PaperExecutionClient
+from crypto_council_flow.tools.execution_nobitex import NobitexExecutionClient
 
 __all__ = [
     # Technical analysis
@@ -91,4 +93,6 @@ __all__ = [
     "Fill",
     "get_execution_client",
     "get_execution_mode",
+    "PaperExecutionClient",
+    "NobitexExecutionClient",
 ]
