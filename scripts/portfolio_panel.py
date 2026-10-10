@@ -3,17 +3,24 @@
 Reads the snapshot + history written by manage_portfolio():
   output/portfolio_plan.json     — latest plan snapshot (full detail)
   output/portfolio_history.jsonl — one line per portfolio cycle (trend)
+  output/paper_ledger.json       — simulated fills (EXECUTION_MODE=paper)
+  output/live_ledger.json        — venue fills reconciled (EXECUTION_MODE=live)
 
 Regenerate after each run:
   .venv/Scripts/python scripts/portfolio_panel.py
+  .venv/Scripts/python scripts/portfolio_panel.py --mode live   # force
 
 Stdlib only. Single self-contained HTML file, auto-refreshes every 60s.
 
-P&L comes from a paper ledger (output/paper_ledger.json +
-output/paper_positions.json) that manage_portfolio() fills each cycle at the
-run's current prices — see _update_paper_ledger() in main.py.
+Ledger provenance is picked per snapshot by _resolve_mode(): paper fills are
+simulated by _update_paper_ledger() in main.py, live fills are the venue's
+own trade history reconstructed by NobitexExecutionClient.reconcile() —
+wallet balances decide *how much* is held, fills supply the price/fee history
+needed to realize P&L. Both write the same row shape, so every section
+renders identically and only the labels differ. `--mode` overrides the
+detection so either ledger can be inspected regardless of what is running.
 
-Equity there is `account_size + realized + unrealized`: cash is
+Equity in both modes is `account_size + realized + unrealized`: cash is
 (account_size - invested), so adding back the market value of open positions
 cancels the `invested` term. It used to subtract `invested` a second time,
 which understated equity by exactly the amount sitting in open positions the
@@ -35,10 +42,66 @@ OUT_DIR = ROOT / "output"
 SNAPSHOT = OUT_DIR / "portfolio_plan.json"
 HISTORY = OUT_DIR / "portfolio_history.jsonl"
 LEDGER = OUT_DIR / "paper_ledger.json"
+LEDGER_LIVE = OUT_DIR / "live_ledger.json"
 PANEL = OUT_DIR / "portfolio_panel.html"
 
 HISTORY_WINDOW = 60          # cycles plotted/listed on the page
 SIGNAL_SLICES = 10           # opportunities shown in the signal table
+
+MODE_PAPER = "paper"
+MODE_LIVE = "live"
+
+# Set from argv by main(); read in build(). A module global rather than a
+# parameter keeps build()'s signature stable for anything already calling it.
+_MODE_OVERRIDE: str | None = None
+
+
+# ---------------------------------------------------------------------------
+# ledger selection (paper vs live)
+# ---------------------------------------------------------------------------
+
+
+def _resolve_mode(snap: dict, override: str | None = None) -> str:
+    """Which ledger this page should read: 'paper' or 'live'.
+
+    An explicit ``--mode`` wins (you can inspect a paper ledger while the
+    bot runs live). Otherwise the snapshot itself says how it was made:
+    ``_reconcile_live_positions()`` stamps ``pnl.mode = "live"`` on the
+    summary it writes, so a live cycle is indistinguishable from a paper
+    one once the file is on disk. Falling back to ``EXECUTION_MODE`` keeps a
+    page built from an old snapshot consistent with the current bot config.
+    """
+    if override:
+        mode = override.strip().lower()
+        return MODE_LIVE if mode == MODE_LIVE else MODE_PAPER
+    pnl = snap.get("pnl")
+    if isinstance(pnl, dict):
+        snap_mode = str(pnl.get("mode") or "").strip().lower()
+        if snap_mode in (MODE_PAPER, MODE_LIVE):
+            # The snapshot says how it was made; the current EXECUTION_MODE is
+            # only a fallback, or restarting the bot in another mode would
+            # rewrite the page's history.
+            return snap_mode
+    if snap.get("pnl_live_note"):
+        return MODE_LIVE
+    import os
+
+    mode = os.getenv("EXECUTION_MODE", MODE_PAPER).strip().lower()
+    return MODE_LIVE if mode == MODE_LIVE else MODE_PAPER
+
+
+def _ledger_path(mode: str) -> Path:
+    """Ledger file for a mode. Paper fills are *simulated* by main.py; live
+    fills are the venue's own trade history reconciled into the same shape
+    by ``NobitexExecutionClient.reconcile()``."""
+    return LEDGER_LIVE if mode == MODE_LIVE else LEDGER
+
+
+def _ledger_label(mode: str) -> str:
+    """Human provenance of the numbers on the page."""
+    if mode == MODE_LIVE:
+        return "live ledger (real venue fills, reconciled)"
+    return "paper ledger (simulated, no real orders)"
 
 # History rows written by steps that are NOT a cycle of their own. risk_tick()
 # runs every 60s with no LLM call to force-close positions between LLM cycles,
@@ -288,12 +351,17 @@ def _row_worth(row: dict) -> float:
     return _num(eq, _num(row.get("account_size")))
 
 
-def _load_ledger() -> list[dict]:
-    """Raw paper-ledger rows (one dict per fill). Corrupt/missing -> []."""
-    if not LEDGER.exists():
+def _load_ledger(path: Path | None = None) -> list[dict]:
+    """Raw ledger rows (one dict per fill). Corrupt/missing -> [].
+
+    ``path`` defaults to the paper ledger so existing callers and tests keep
+    working; the panel passes the mode-selected one.
+    """
+    target = LEDGER if path is None else path
+    if not target.exists():
         return []
     try:
-        raw = json.loads(LEDGER.read_text(encoding="utf-8"))
+        raw = json.loads(target.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return []
     if not isinstance(raw, list):
@@ -519,23 +587,35 @@ def _allocation_donut(slices: list[tuple[str, float, str]], size: int = 150) -> 
 # ---------------------------------------------------------------------------
 
 
-def _strip(snap: dict, now: datetime, cur: str) -> str:
+def _strip(snap: dict, now: datetime, cur: str, *, mode: str = MODE_PAPER,
+           error: str | None = None) -> str:
     age = _age(snap.get("saved_utc"), now)
     stale = age == "—" or age.endswith("d old") or age == "in the future"
     badge = (
         f"<span class='dot {'warn' if stale else 'live'}'></span>"
         f"<span>snapshot <b>{_esc(age)}</b></span>"
     )
+    provenance = (
+        f"<span>ledger <b>{'LIVE' if mode == MODE_LIVE else 'paper'}</b></span>"
+    )
+    note = ""
+    if error:
+        note = (
+            f"<span class='strip-err'>live reconciliation failed — "
+            f"{_esc(error)} <i>(showing previous local state)</i></span>"
+        )
     return (
         "<div class='strip'>"
         f"{badge}"
         f"<span>cycle <b>#{_esc(snap.get('portfolio_cycle', '?'))}</b></span>"
         f"<span>saved <b>{_esc(_stamp(snap.get('saved_utc')))}</b></span>"
         f"<span>base <b>{_esc(cur)}</b></span>"
+        f"{provenance}"
         f"<span>caps <b>{_num(snap.get('max_total_exposure_pct'), 60):.0f}% total"
         f" / {_num(snap.get('max_single_position_pct'), 20):.0f}% single</b></span>"
         f"<span>page built <b>{now.strftime('%Y-%m-%d %H:%M UTC')}</b></span>"
         f"<span>auto-refresh <b>60s</b></span>"
+        f"{note}"
         "</div>"
     )
 
@@ -667,20 +747,22 @@ def _positions(
         + f"<p class='muted'>Amounts in {cur}. <b>Delta</b> is the rebalance flow "
         "(target − current), not profit — a positive delta is capital to deploy, "
         "not a gain. <b>Filled qty</b>/<b>Filled amt</b> are the net figures the "
-        "paper ledger computed and booked this cycle at the cached close price: "
-        "positive deploys capital, negative returns it. '—' means the target already "
-        f"matched the held position or no price was available ({len(fills)} coin(s) "
-        "filled). <b>Stop</b>/<b>Take</b> are 0.5x-ATR / "
-        "1x-ATR price levels in the quote currency, informational: no orders are "
-        "placed. <b>SL/TP src</b>: explicit = crew-supplied level within 20% of ATR "
-        "kept, computed = deterministic ATR used, none = unavailable (e.g. "
-        f"rate-limited). <b>Score</b> is the scout/analyst score for that coin. "
+        + ("ledger computed and booked this cycle at the cached close price: "
+           "positive deploys capital, negative returns it. In paper mode these are "
+           "simulated; in live mode they are the venue's own reported fills. ")
+        + f"'—' means the target already matched the held position or no price was "
+        f"available ({len(fills)} coin(s) filled). <b>Stop</b>/<b>Take</b> are "
+        "0.5x-ATR / 1x-ATR price levels in the quote currency, informational: no "
+        "orders are placed. <b>SL/TP src</b>: explicit = crew-supplied level within "
+        "20% of ATR kept, computed = deterministic ATR used, none = unavailable "
+        "(e.g. rate-limited). <b>Score</b> is the scout/analyst score for that "
+        "coin. "
         "</p></div>"
     )
 
 
 def _fills_section(fills: dict[str, dict], rows: list[dict], cycle: object, cur: str,
-                   symbol_by_coin: dict) -> str:
+                   symbol_by_coin: dict, *, mode: str = MODE_PAPER) -> str:
     """Computed fills of this cycle, one row per ledger entry.
 
     This is the raw arithmetic the plan is executed with — qty = target / price
@@ -688,15 +770,20 @@ def _fills_section(fills: dict[str, dict], rows: list[dict], cycle: object, cur:
     its held position is visibly a no-op rather than a silent omission.
     """
     head = (
-        "<div class='card'><h2>Computed fills <small class='muted'>paper ledger, "
-        "this cycle</small></h2>"
+        "<div class='card'><h2>Computed fills <small class='muted'>"
+        + _esc(_ledger_label(mode))
+        + ", this cycle</small></h2>"
     )
     if not rows:
         return (
             head
-            + "<p class='muted'>The paper ledger has no fills yet. It is written "
-            "at the end of the first portfolio cycle that trades — every fill, "
-            "its quantity, price and amount appear here.</p></div>"
+            + "<p class='muted'>The "
+            + ("live ledger has no fills yet. Venue trades are pulled in at the "
+               "end of each portfolio cycle and appear here." if mode == MODE_LIVE
+               else "paper ledger has no fills yet. It is written at the end of the "
+               "first portfolio cycle that trades — every fill, its quantity, "
+               "price and amount appear here.")
+            + "</p></div>"
         )
     out = []
     for r in reversed(rows[-25:]):
@@ -737,13 +824,22 @@ def _fills_section(fills: dict[str, dict], rows: list[dict], cycle: object, cur:
     )
 
 
-def _pnl_section(pnl: dict, cur: str) -> str:
+def _pnl_section(pnl: dict, cur: str, *, mode: str = MODE_PAPER) -> str:
+    label = _ledger_label(mode)
     if not pnl:
+        if mode == MODE_LIVE:
+            detail = ("No ledger data yet — the live ledger is reconstructed at "
+                      "the end of the first live portfolio cycle, once the "
+                      "venue reports trades. Until then, treat the exposure "
+                      "figures as the plan, not a result.")
+        else:
+            detail = ("No ledger data yet — the paper ledger is filled at the "
+                      "end of the first portfolio cycle that trades. Until "
+                      "then, treat the exposure figures as the plan, not a "
+                      "result.")
         return (
             "<div class='card warn'><h2>Profit / loss</h2>"
-            "<p>No ledger data yet — the paper ledger is filled at the end of the "
-            "first portfolio cycle that trades. Until then, treat the exposure "
-            "figures as the plan, not a result.</p></div>"
+            f"<p>{detail}</p></div>"
         )
     open_pos = pnl.get("open_positions") or []
     rows = "".join(
@@ -760,10 +856,16 @@ def _pnl_section(pnl: dict, cur: str) -> str:
             _num(p.get("unrealized_pnl")),
         )
         for p in open_pos
-    ) or "<tr><td colspan='6'>No open paper positions.</td></tr>"
+    ) or (
+        "<tr><td colspan='6'>"
+        + ("No open live positions." if mode == MODE_LIVE
+           else "No open paper positions.")
+        + "</td></tr>"
+    )
     return (
-        "<div class='card'><h2>Profit / loss <small class='muted'>paper ledger, "
-        "not real orders</small></h2><div class='kpis'>"
+        "<div class='card'><h2>Profit / loss <small class='muted'>"
+        + _esc(label)
+        + "</small></h2><div class='kpis'>"
         f"<div class='card kpi'><span>Total P&amp;L</span>"
         f"<b class='{_pnl_class(pnl.get('total_pnl'))}'>"
         f"{_num(pnl.get('total_pnl')):+,.2f} {cur}</b></div>"
@@ -926,10 +1028,15 @@ def build() -> str:
     pnl = snap.get("pnl") or {}
     cycle = snap.get("portfolio_cycle")
 
+    # Paper fills are simulated by main.py; live fills are the venue's own
+    # trade history reconciled into the same shape. Both render identically,
+    # but the page must show where the numbers came from.
+    mode = _resolve_mode(snap, _MODE_OVERRIDE)
+    ledger = _load_ledger(_ledger_path(mode))
+
     # Computed fills: the ledger is the only place a target notional becomes a
     # quantity and a traded amount, so read it directly rather than leaving the
     # computed size invisible on the page.
-    ledger = _load_ledger()
     cycle_fills = _fills_for_cycle(ledger, cycle)
     cycle_rows = [
         r for r in ledger
@@ -942,12 +1049,13 @@ def build() -> str:
         symbol_by_coin.setdefault(str(pos.get("coin_id", "")), str(pos.get("coin_id", "")))
 
     body = (
-        _strip(snap, now, cur)
+        _strip(snap, now, cur, mode=mode,
+               error=(snap.get("pnl") or {}).get("error") if mode == MODE_LIVE else None)
         + _kpis(plan, snap, actions, pnl, cur)
         + _allocation(actions, _num(plan.get("cash_remaining")))
         + _positions(actions, score_by_coin, _num(snap.get("account_size")), cur, cycle_fills)
-        + _fills_section(cycle_fills, cycle_rows, cycle, cur, symbol_by_coin)
-        + _pnl_section(pnl, cur)
+        + _fills_section(cycle_fills, cycle_rows, cycle, cur, symbol_by_coin, mode=mode)
+        + _pnl_section(pnl, cur, mode=mode)
         + _history_section(hist, cur, ticks_hidden=_count_hidden_rows())
         + _signals(opps)
         + "<div class='card'><h2>Manager rationale</h2>"
@@ -1031,6 +1139,8 @@ small { opacity: .55; font-size: .85em; }
 .delta { font-size: .84em; opacity: .8; margin: 4px 0 12px; }
 .warn { border-color: #6b5a2a; }
 .warn h2 { color: #e8c15a; }
+.strip .strip-err { flex-basis: 100%; color: #e8c15a; font-size: .95em; }
+.strip .strip-err i { opacity: .7; font-style: normal; }
 .empty { text-align: center; padding: 48px 24px; }
 .empty p { opacity: .8; }
 code { background: #00000055; padding: 2px 6px; border-radius: 4px;
@@ -1054,12 +1164,32 @@ code { background: #00000055; padding: 2px 6px; border-radius: 4px;
 """
 
 
+def _parse_args(argv: list[str]) -> str | None:
+    """Read `--mode paper|live`; anything else is ignored (exits cleanly)."""
+    for i, arg in enumerate(argv):
+        if arg == "--mode" and i + 1 < len(argv):
+            val = argv[i + 1].strip().lower()
+            if val in (MODE_PAPER, MODE_LIVE):
+                return val
+            print(f"panel: unknown --mode {val!r} (expected paper|live)")
+        elif arg.startswith("--mode="):
+            val = arg.split("=", 1)[1].strip().lower()
+            if val in (MODE_PAPER, MODE_LIVE):
+                return val
+            print(f"panel: unknown --mode {val!r} (expected paper|live)")
+    return None
+
+
 def main() -> int:
+    global _MODE_OVERRIDE
+    _MODE_OVERRIDE = _parse_args(sys.argv[1:])
     OUT_DIR.mkdir(exist_ok=True)
     PANEL.write_text(build(), encoding="utf-8")
     snap, problem = _load_snapshot()
     n = len((snap.get("plan") or {}).get("actions") or []) if snap else 0
     state = f"{n} actions" if snap else f"NO SNAPSHOT ({problem})"
+    if _MODE_OVERRIDE:
+        state += f" · forced {_MODE_OVERRIDE} ledger"
     print(f"panel -> {PANEL}  ({state})")
     return 0
 

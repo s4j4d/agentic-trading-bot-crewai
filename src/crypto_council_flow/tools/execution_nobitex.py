@@ -50,6 +50,7 @@ from crypto_council_flow.tools.execution_base import (
     Balance,
     ExecutionClient,
     ExecutionError,
+    ExecutionHalted,
     Fill,
     OrderRequest,
     OrderResult,
@@ -58,11 +59,22 @@ from crypto_council_flow.tools.execution_base import (
     OrderType,
     register_execution_client,
 )
+from crypto_council_flow.tools.execution_safety import (
+    DailyLossBreaker,
+    allow_close,
+    enforce_exposure_caps,
+)
 
 _DEFAULT_BASE_URL = "https://apiv2.nobitex.ir"
 _DEFAULT_TIMEOUT = 20
 _DEFAULT_MAX_RETRIES = 3
 _DEFAULT_BACKOFF = 0.5  # seconds; doubled per retry
+
+# Phase 6 fallback caps, used only when the caller passes none and no env
+# override exists. They mirror the flow's own defaults so a client used
+# standalone is not silently uncapped.
+_DEFAULT_MAX_TOTAL_PCT = 0.30
+_DEFAULT_MAX_SINGLE_PCT = 0.05
 
 # Nobitex order-status vocabulary -> normalized OrderStatus.
 _STATUS_MAP = {
@@ -87,6 +99,17 @@ _EXECUTION_MAP = {
 def _decimals_from_env(name: str, default: int) -> int:
     try:
         return max(0, int(os.getenv(name, str(default)) or default))
+    except (TypeError, ValueError):
+        return default
+
+
+def _pct_from_env(name: str, default: float) -> float:
+    """Read an optional percentage env var; None/blank/invalid -> default."""
+    raw = os.getenv(name)
+    if raw is None or str(raw).strip() == "":
+        return default
+    try:
+        return float(raw)
     except (TypeError, ValueError):
         return default
 
@@ -118,7 +141,6 @@ def _iso_to_epoch_ms(value: Any) -> int | None:
     if not value:
         return None
     from datetime import datetime, timezone
-
     try:
         text = str(value).strip().replace("Z", "+00:00")
         dt = datetime.fromisoformat(text)
@@ -127,6 +149,25 @@ def _iso_to_epoch_ms(value: Any) -> int | None:
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=timezone.utc)
     return int(dt.timestamp() * 1000)
+
+
+def _epoch_ms_to_iso(value: Any) -> str | None:
+    """Render epoch milliseconds as an ISO-8601 UTC string (best effort).
+
+    Inverse of :func:`_iso_to_epoch_ms`, so a live fill's ``ts`` (epoch ms)
+    can be written into a ledger row in the same format paper uses.
+    """
+    if not value:
+        return None
+    try:
+        ms = int(value)
+    except (TypeError, ValueError):
+        return None
+    from datetime import datetime, timezone
+    try:
+        return datetime.fromtimestamp(ms / 1000.0, tz=timezone.utc).isoformat()
+    except (OverflowError, OSError, ValueError):
+        return None
 
 
 class NobitexExecutionClient(ExecutionClient):
@@ -709,6 +750,9 @@ class NobitexExecutionClient(ExecutionClient):
         base_currency: str,
         now_iso: str,
         cycle: int,
+        max_total_pct: float | None = None,
+        max_single_pct: float | None = None,
+        breaker_ledger: list[dict[str, Any]] | None = None,
     ) -> dict[str, Any]:
         """Translate plan deltas into real spot orders and summarize.
 
@@ -745,7 +789,17 @@ class NobitexExecutionClient(ExecutionClient):
             (paper's ``n_trades`` is cumulative ledger length). One JSONL
             row per real (non-dry-run) cycle is appended to
             ``EXECUTION_LOG_PATH`` (default
-            ``output/live_executions.jsonl``), best-effort.
+            ``output/live_executions.jsonl``), best-effort;
+          * **Phase 6** re-checks every order pre-trade against the caps
+            (``max_total_pct``/``max_single_pct`` — fractions of the
+            account, defaulting to the flow's own 30%/5% or the
+            ``EXECUTION_MAX_TOTAL_PCT``/``EXECUTION_MAX_SINGLE_PCT`` env
+            overrides) and refuses to place new entries once today's
+            realized loss reaches the daily-loss limit
+            (``EXECUTION_MAX_DAILY_LOSS_PCT``, from ``breaker_ledger``).
+            Sells/closes are never capped — the circuit must never trap a
+            losing position. A dry run builds the same orders but is not
+            blocked, so rehearsals can run at any cap/loss state.
         """
         snapshot = risk_snapshot or {}
         since_ms = _iso_to_epoch_ms(now_iso)
@@ -758,16 +812,66 @@ class NobitexExecutionClient(ExecutionClient):
         )
 
         pre_balances = {
-            b.asset.upper(): float(b.free or 0.0) for b in self.get_balances()
+            b.asset.upper(): float(b.total or 0.0) for b in self.get_balances()
         }
+        quote = self.quote_currency.upper()
         coin_by_asset = {
             str(a.get("symbol") or "").strip().upper(): str(a.get("coin_id") or "")
             for a in (plan or {}).get("actions", [])
             if isinstance(a, dict) and str(a.get("symbol") or "").strip()
         }
 
+        def _coin_for(asset: str, fallback: str) -> str:
+            """Resolve a wallet asset to the snapshot's ``coin_id`` key.
+
+            The plan's actions are the only place ticker and ``coin_id``
+            appear together, so an asset the plan does not mention (a
+            leftover from an earlier cycle, or a manual deposit) has no
+            mapping. Falling back to ``""`` prices it at 0 *and* hides it
+            from the panel, which filters blank ids; the lowercase asset is
+            not a ``coin_id`` either, but it is at least non-empty and
+            traceable.
+            """
+            return coin_by_asset.get(asset) or fallback
+
+        # Pre-trade exposure in quote terms, from the same balance fetch —
+        # the caps are checked against what the wallet really holds now, not
+        # what the plan assumed when it was priced (Phase 6).
+        pre_positions = [
+            {"asset": a, "qty": q,
+             "price": float((snapshot.get(_coin_for(a, a.lower())) or {}).get("current_price") or 0.0)}
+            for a, q in pre_balances.items()
+            if a != quote and q > 0
+        ]
+        for p in pre_positions:
+            p["market_value"] = p["qty"] * p["price"]
+
         orders: list[dict[str, Any]] = []
         errors: list[dict[str, Any]] = []
+
+        # ------------------------------------------------------------------
+        # Phase 6 safety guards.
+        #
+        # The allocator priced this plan on the *last* price it saw; these
+        # re-check every order at fill time against what the wallet holds
+        # *now*. Sells/closes are never capped (de-risking must always stay
+        # possible) and the breaker fails closed — an open circuit raises,
+        # it never demotes to paper and books simulated profits.
+        # ------------------------------------------------------------------
+        max_total_pct = (
+            max_total_pct if max_total_pct is not None
+            else _pct_from_env("EXECUTION_MAX_TOTAL_PCT", _DEFAULT_MAX_TOTAL_PCT)
+        )
+        max_single_pct = (
+            max_single_pct if max_single_pct is not None
+            else _pct_from_env("EXECUTION_MAX_SINGLE_PCT", _DEFAULT_MAX_SINGLE_PCT)
+        )
+        if not dry_run:
+            breaker = DailyLossBreaker(
+                account_size, ledger=breaker_ledger or [], now_iso=now_iso,
+            )
+        else:
+            breaker = None  # a rehearsal must not be blocked by the circuit
 
         for a in (plan or {}).get("actions", []):
             if not isinstance(a, dict):
@@ -826,6 +930,46 @@ class NobitexExecutionClient(ExecutionClient):
                 orders.append({"dry_run": True, "coin_id": coin_id,
                                **request.model_dump()})
                 continue
+            # Phase 6: pre-trade safety. Downsize if there is room, block if
+            # not, and let the breaker refuse new risk on a losing day.
+            order_dict = {
+                "symbol": venue_symbol, "side": side,
+                "qty": qty, "notional": qty * px,
+            }
+            verdict = enforce_exposure_caps(
+                order_dict,
+                account_size=float(account_size or 0.0),
+                free_cash=pre_balances.get(quote, 0.0),
+                holdings=pre_balances,
+                prices={b: (float((snapshot.get(_coin_for(b, b.lower())) or {}).get("current_price") or 0.0)) for b in pre_balances},
+                max_total_pct=max_total_pct,
+                max_single_pct=max_single_pct,
+                positions=pre_positions,
+            )
+            if verdict["action"] == "block":
+                errors.append({
+                    "coin_id": coin_id, "symbol": venue_symbol,
+                    "error": f"blocked by Phase 6 caps: {verdict['reason']}",
+                })
+                continue
+            if verdict["action"] == "downsize":
+                qty = verdict["qty"]
+                errors.append({
+                    "coin_id": coin_id, "symbol": venue_symbol,
+                    "error": f"downsized by Phase 6 caps: {verdict['reason']}",
+                })
+                request = request.model_copy(
+                    update={"qty": _format_decimal(Decimal(str(qty)))}
+                )
+            if breaker is not None:
+                try:
+                    breaker.guard(order_dict, now_iso=now_iso)
+                except ExecutionHalted as exc:
+                    errors.append({
+                        "coin_id": coin_id, "symbol": venue_symbol,
+                        "error": f"blocked by Phase 6 circuit breaker: {exc}",
+                    })
+                    continue
             try:
                 result = self.place_order(request)
             except ExecutionError as exc:
@@ -891,7 +1035,7 @@ class NobitexExecutionClient(ExecutionClient):
                 continue
             if asset == quote:
                 continue  # cash is not a position (paper parity)
-            cid = coin_by_asset.get(asset, "")
+            cid = _coin_for(asset, asset.lower())
             try:
                 asset_px = float((snapshot.get(cid) or {}).get("current_price") or 0.0)
             except (TypeError, ValueError):
@@ -941,6 +1085,198 @@ class NobitexExecutionClient(ExecutionClient):
             except Exception:
                 pass
         return summary
+
+    # -- reconciliation (Phase 5) ----------------------------------------------
+    #
+    # A local ledger built by replaying fills drifts from reality: fills that
+    # straddle a watermark, partial fills and duplicates all corrupt a running
+    # cost basis. The venue's wallet balances are the single source of truth
+    # for *how much we hold*; fills only supply the *history* (prices, fees
+    # and side) needed to realize P&L and build a cost basis from scratch.
+    #
+    # Strategy: rebuild positions from a persistent local ledger that is
+    # itself corrected against venue balances. Each reconcile call:
+    #   1. fetches current balances (truth for qty),
+    #   2. nets the new fills per coin into buy/sell flow,
+    #   3. rewrites cost basis so qty and cost stay consistent,
+    #   4. emits one ledger row per fill (paper-shaped) plus a correction row
+    #      when the venue qty disagrees with the ledger-derived qty.
+
+    def _fills_by_coin(self, fills: list[Fill]) -> dict[str, list[Fill]]:
+        """Group fills by lowercase base asset (``BTC-RLS`` -> ``btc``)."""
+        out: dict[str, list[Fill]] = {}
+        for f in fills:
+            symbol = str(f.symbol or "").upper()
+            if not symbol:
+                continue
+            base = symbol.split("-", 1)[0].strip().lower()
+            if not base or base == self.quote_currency.lower():
+                continue
+            out.setdefault(base, []).append(f)
+        return out
+
+    def reconcile(
+        self,
+        fills: list[Fill],
+        positions: dict[str, dict[str, float]],
+        *,
+        cycle: int | None = None,
+        now_iso: str | None = None,
+        coin_ids_by_symbol: dict[str, str] | None = None,
+    ) -> tuple[dict[str, dict[str, float]], list[dict[str, Any]]]:
+        """Reconcile a batch of fills into local position state + ledger rows.
+
+        Balance is the source of truth for *quantity*; fills supply *history*
+        (price, side, fee) so realized P&L and cost basis can be derived
+        rather than accumulated by drift-prone replay. For each coin the
+        fills are written as paper-shaped ledger rows, then the local
+        quantity is corrected to the wallet's, with a ``correction`` row
+        recording any disagreement so nothing changes silently.
+
+        ``cycle``/``now_iso`` label every row so the panel attributes them
+        to a cycle exactly as it does paper rows.
+
+        ``coin_ids_by_symbol`` maps venue tickers (``BTC``) to ``coin_id``
+        (``bitcoin``). Positions are keyed by ``coin_id`` everywhere else in
+        the flow (risk snapshot, paper ledger, panel), but fills and wallets
+        only ever speak tickers; without this map every live position would
+        be keyed ``btc`` and then price at zero when looked up as
+        ``bitcoin``. Unmapped assets fall back to the lowercase ticker, which
+        is at least stable across cycles.
+        """
+        symbol_to_coin = coin_ids_by_symbol or {}
+        balances = {
+            # `total`, not `free`: funds locked in an open order are still
+            # ours, and reading them as 0 drops the position while the order
+            # is still working (plus a spurious `close` row).
+            b.asset.lower(): float(b.total or 0.0) for b in self.get_balances()
+        }
+        by_asset = self._fills_by_coin(fills)
+        # Normalise both sources onto `coin_id` before touching positions,
+        # since the rest of the flow (risk snapshot, paper ledger, panel)
+        # speaks `coin_id` while the venue only knows tickers.
+        by_coin = {
+            symbol_to_coin.get(asset.upper(), asset): list(asset_fills)
+            for asset, asset_fills in by_asset.items()
+        }
+        balances = {
+            symbol_to_coin.get(asset.upper(), asset): qty
+            for asset, qty in balances.items()
+        }
+        updated: dict[str, dict[str, float]] = {
+            cid: dict(pos) for cid, pos in positions.items()
+        }
+        ledger: list[dict[str, Any]] = []
+        ts = now_iso or ""
+        quote = self.quote_currency.upper()
+
+        def fee_to_quote(fee: float, fee_ccy: str, price: float) -> float:
+            """Quote value of a fee charged in base/quote (0 when unknown)."""
+            if fee <= 0 or not fee_ccy:
+                return 0.0
+            if fee_ccy == quote:
+                return fee
+            if price > 0:
+                return fee * price
+            return 0.0
+
+        for coin_id in sorted(set(by_coin) | set(updated)):
+            venue_qty = max(0.0, balances.get(coin_id, 0.0))
+            pos = updated.setdefault(coin_id, {"qty": 0.0, "avg_cost": 0.0})
+            cost = float(pos.get("avg_cost") or 0.0)
+            prior_qty = float(pos.get("qty") or 0.0)
+            coin_fills = by_coin.get(coin_id, [])
+
+            # -- 1. one ledger row per fill (paper-shaped) --------------------
+            for f in sorted(coin_fills, key=lambda x: int(x.ts or 0)):
+                qty = abs(float(f.qty or 0.0))
+                price = float(f.price or 0.0)
+                if qty <= 0 or price <= 0:
+                    continue  # unpriced fill: cannot contribute to P&L
+                fee = float(f.fee or 0.0)
+                fee_ccy = str(f.fee_currency or "").upper()
+                side = str(f.side or "").lower()
+                ledger.append({
+                    "ts": _epoch_ms_to_iso(f.ts) or ts,
+                    "cycle": cycle,
+                    "coin_id": coin_id,
+                    "side": side,
+                    "qty": qty,
+                    "price": price,
+                    "amount": qty * price,
+                    "realized_pnl": None if side == OrderSide.BUY else qty * (price - cost) - fee_to_quote(fee, fee_ccy, price),
+                    "fee": fee or None,
+                    "fee_currency": fee_ccy or None,
+                    "trade_id": f.trade_id,
+                    "order_id": f.order_id,
+                    "source": "live_fill",
+                })
+
+            # -- 2. cost basis from the batch --------------------------------
+            bought_qty = sum(
+                float(f.qty or 0.0) for f in coin_fills
+                if str(f.side or "").lower() == OrderSide.BUY
+            )
+            sold_qty = sum(
+                float(f.qty or 0.0) for f in coin_fills
+                if str(f.side or "").lower() == OrderSide.SELL
+            )
+            if bought_qty > 0:
+                bought_value = sum(
+                    float(f.qty or 0.0) * float(f.price or 0.0) for f in coin_fills
+                    if str(f.side or "").lower() == OrderSide.BUY
+                )
+                bought_fees = sum(
+                    fee_to_quote(
+                        float(f.fee or 0.0),
+                        str(f.fee_currency or "").upper(),
+                        float(f.price or 0.0),
+                    )
+                    for f in coin_fills
+                    if str(f.side or "").lower() == OrderSide.BUY
+                )
+                batch_cost = (bought_value + bought_fees) / bought_qty
+                if sold_qty <= 0 and (prior_qty + bought_qty) > 0:
+                    # Blend the batch into whatever the ledger already held.
+                    pos["avg_cost"] = (
+                        prior_qty * cost + bought_qty * batch_cost
+                    ) / (prior_qty + bought_qty)
+                else:
+                    # Buys and sells in one batch: the sell realized against
+                    # the old cost, so the residual basis is the batch's.
+                    pos["avg_cost"] = batch_cost
+
+            # -- 3. wallet wins for quantity ----------------------------------
+            # A correction row is only honest when the wallet DISAGREES with
+            # what the fills explain. On a first buy the fills fully account
+            # for the position, so no correction may be emitted — labeling
+            # every open a "correction" would make the audit trail noise.
+            expected_qty = prior_qty + bought_qty - sold_qty
+            if venue_qty > 0:
+                pos["qty"] = venue_qty
+                if abs(venue_qty - expected_qty) > 1e-9:
+                    ledger.append({
+                        "ts": ts, "cycle": cycle, "coin_id": coin_id,
+                        "side": "correction",
+                        "qty": venue_qty - expected_qty,
+                        "price": 0.0, "amount": 0.0, "realized_pnl": None,
+                        "note": (f"venue qty {venue_qty:g} vs fills-derived "
+                                 f"{expected_qty:g} — local qty corrected to "
+                                 "the wallet"),
+                        "source": "live_correction",
+                    })
+            else:
+                if prior_qty > 0:
+                    ledger.append({
+                        "ts": ts, "cycle": cycle, "coin_id": coin_id,
+                        "side": "close", "qty": prior_qty,
+                        "price": 0.0, "amount": 0.0, "realized_pnl": None,
+                        "note": "wallet holds none — position closed by reconciliation",
+                        "source": "live_correction",
+                    })
+                updated.pop(coin_id, None)
+
+        return updated, ledger
 
 
 register_execution_client("nobitex", NobitexExecutionClient)

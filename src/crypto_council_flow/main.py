@@ -59,6 +59,13 @@ from crypto_council_flow.crews.council.council_crew import (
     PortfolioAction,
     PortfolioPlan,
 )
+from crypto_council_flow.tools.execution_base import (
+    MODE_PAPER,
+    ExecutionError,
+    ExecutionHalted,
+    get_execution_client,
+    get_execution_mode,
+)
 from crypto_council_flow.tools.technical_indicators import _fetch_ohlcv
 
 # ---------------------------------------------------------------------------
@@ -106,6 +113,30 @@ OUTPUT_DIR: Path = Path("output")
 CONSOLIDATED_RESULTS: Path = OUTPUT_DIR / "all_analysis_results.txt"
 LEDGER_PATH: Path = OUTPUT_DIR / "paper_ledger.json"
 POSITIONS_PATH: Path = OUTPUT_DIR / "paper_positions.json"
+# Phase 5: the mirrored ledger for live mode. Fills arrive from the venue
+# already executed, so unlike paper the local ledger is a *reconciliation*
+# of what the venue reports, not the origin of the trade. Kept separate so
+# paper and live state can never contaminate each other.
+LEDGER_LIVE_PATH: Path = OUTPUT_DIR / "live_ledger.json"
+POSITIONS_LIVE_PATH: Path = OUTPUT_DIR / "live_positions.json"
+
+
+def _live_breaker_ledger() -> list[dict[str, Any]]:
+    """Live fills for the Phase 6 daily-loss breaker; ``[]`` when unavailable.
+
+    Reads the reconciled live ledger (Phase 5) and returns its rows. A
+    missing, unreadable or wrongly-shaped file yields ``[]`` and the breaker
+    sees no loss — the trade would then be judged on *today's* fills only,
+    which is why the reconcile step runs before the plan is applied. Refusing
+    to trade because the file is corrupt is deliberately avoided here: the
+    caps still apply, and the breaker only opens on evidence of a loss.
+    """
+    try:
+        raw = LEDGER_LIVE_PATH.read_text(encoding="utf-8")
+        rows = json.loads(raw)
+    except (OSError, ValueError):
+        return []
+    return rows if isinstance(rows, list) else []
 
 
 # ---------------------------------------------------------------------------
@@ -661,7 +692,48 @@ class CryptoCouncilFlow(Flow[CryptoCouncilState]):
                 self.state.base_currency,
                 self.state.last_portfolio_utc,
                 self.state.portfolio_cycle,
+                max_total_pct=self.state.max_total_exposure_pct / 100.0,
+                max_single_pct=self.state.max_single_position_pct / 100.0,
+                breaker_ledger=_live_breaker_ledger(),
             )
+
+            # Phase 5: in live mode the venue — not us — authors the fills,
+            # so pull them back and reconcile the local ledger against the
+            # wallet. Paper mode returns None and keeps its own summary.
+            live_note: str | None = None
+            # Ticker -> coin_id, used by live reconciliation to map venue
+            # assets (BTC-RLS) onto the coin_id the risk snapshot and the
+            # paper ledger are keyed by (bitcoin). plan_symbols is
+            # coin_id -> symbol, so invert it.
+            coin_ids_by_symbol = {
+                v.upper(): k for k, v in plan_symbols.items() if v
+            }
+            live_summary = _reconcile_live_positions(
+                cycle=self.state.portfolio_cycle,
+                now_iso=self.state.last_portfolio_utc,
+                account_size=self.state.account_size,
+                base_currency=self.state.base_currency,
+                risk_snapshot=risk_snapshot,
+                coin_ids_by_symbol=coin_ids_by_symbol,
+            )
+            if live_summary and live_summary.get("error"):
+                # Surface the failure to the panel: the banner reads
+                # snap["pnl"]["error"], which would never fire if we dropped
+                # this summary and left paper's (error-free) result in place.
+                # Paper's numbers stay as the displayed P&L, now labelled
+                # "reconciliation failed" rather than silently passing stale
+                # state off as current.
+                pnl_summary["error"] = str(live_summary["error"])
+                print(
+                    f"[Live] Reconciliation failed (previous local state kept): "
+                    f"{pnl_summary['error']}"
+                )
+            elif live_summary:
+                pnl_summary = live_summary
+                live_note = (
+                    "live reconciliation: fills pulled from the venue and "
+                    "matched against wallet balances"
+                )
 
             OUTPUT_DIR.mkdir(exist_ok=True)
             snapshot = {
@@ -677,6 +749,8 @@ class CryptoCouncilFlow(Flow[CryptoCouncilState]):
                 "analysed_coins": analysed_coins_json,
                 "pnl": pnl_summary,
             }
+            if live_note:
+                snapshot["pnl_live_note"] = live_note
             (OUTPUT_DIR / "portfolio_plan.json").write_text(
                 json.dumps(snapshot, ensure_ascii=False, indent=2), encoding="utf-8"
             )
@@ -778,6 +852,9 @@ class CryptoCouncilFlow(Flow[CryptoCouncilState]):
             self.state.base_currency,
             now_utc.isoformat(),
             self.state.portfolio_cycle,
+            max_total_pct=self.state.max_total_exposure_pct / 100.0,
+            max_single_pct=self.state.max_single_position_pct / 100.0,
+            breaker_ledger=_live_breaker_ledger(),
         )
         OUTPUT_DIR.mkdir(exist_ok=True)
         with (OUTPUT_DIR / "portfolio_history.jsonl").open("a", encoding="utf-8") as fh:
@@ -866,6 +943,9 @@ def _update_paper_ledger(
     base_currency: str,
     now_iso: str,
     cycle: int,
+    max_total_pct: float | None = None,
+    max_single_pct: float | None = None,
+    breaker_ledger: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Fill the plan against the paper ledger using current prices.
 
@@ -878,6 +958,12 @@ def _update_paper_ledger(
     paper-style fills are ever produced against a live venue.
     ``EXECUTION_MODE=halted`` raises ``ExecutionHalted`` from the factory.
 
+    Phase 6: ``max_total_pct``/``max_single_pct`` (fractions of the account)
+    and ``breaker_ledger`` (live fills for today's realized P&L) are threaded
+    through to the live client. They are ``None`` for paper, whose caps are
+    advisory (the plan is already sized by the same numbers) and which has no
+    venue to guard.
+
     Prices come from the risk snapshot (cached OHLC close) — zero new network
     calls. Positions are tracked as {coin_id: {qty, avg_cost}} in
     paper_positions.json; trades append to paper_ledger.json.
@@ -889,6 +975,15 @@ def _update_paper_ledger(
             f"execution client {client.name!r} does not implement apply_plan; "
             "live order translation lands in a later phase"
         )
+    kwargs: dict[str, Any] = {}
+    if get_execution_mode() != MODE_PAPER:
+        # Live only: paper's apply_plan signature stays untouched, and a
+        # client that predates the guards is still callable.
+        kwargs = {
+            "max_total_pct": max_total_pct,
+            "max_single_pct": max_single_pct,
+            "breaker_ledger": breaker_ledger,
+        }
     return apply_plan(
         plan=plan,
         risk_snapshot=risk_snapshot,
@@ -896,6 +991,7 @@ def _update_paper_ledger(
         base_currency=base_currency,
         now_iso=now_iso,
         cycle=cycle,
+        **kwargs,
     )
 
 
@@ -909,12 +1005,6 @@ def _execution_client_for_ledger(base_currency: str | None = None):
     ``ExecutionError`` when no live client is registered — both fail loudly
     rather than silently falling back to paper.
     """
-    from crypto_council_flow.tools.execution_base import (
-        MODE_PAPER,
-        get_execution_client,
-        get_execution_mode,
-    )
-
     if get_execution_mode() == MODE_PAPER:
         from crypto_council_flow.tools.execution_paper import PaperExecutionClient
 
@@ -924,6 +1014,203 @@ def _execution_client_for_ledger(base_currency: str | None = None):
             quote_currency=base_currency or base_currency_hint(),
         )
     return get_execution_client()
+
+
+def _reconcile_live_positions(
+    *,
+    cycle: int,
+    now_iso: str,
+    account_size: float,
+    base_currency: str,
+    risk_snapshot: dict[str, dict[str, float]] | None = None,
+    coin_ids_by_symbol: dict[str, str] | None = None,
+) -> dict[str, Any] | None:
+    """Phase 5: pull new venue fills, reconcile them into a local ledger.
+
+    Live mode never authors its own fills — the venue does — so the local
+    ``live_positions.json``/``live_ledger.json`` pair is a *reconstruction*
+    of what the wallet reports, refreshed every cycle. Returns a P&L summary
+    in the same shape ``apply_plan`` returns so the panel can render live
+    rows exactly like paper ones, or ``None`` in paper mode / on failure.
+
+    ``risk_snapshot`` is keyed by ``coin_id`` (``bitcoin``), but the venue
+    reports assets by ticker (``BTC-RLS`` -> ``btc``), so
+    ``coin_ids_by_symbol`` (ticker -> ``coin_id``, taken from the plan's
+    actions) is what lets the reconciled positions find their prices. It is
+    best-effort: assets still unmapped price at 0, which the caller can see
+    as ``unrealized_pnl: None`` rather than a wrong non-zero number.
+
+    Fails open: a venue hiccup must not kill the portfolio cycle, so the
+    error is returned as ``{"error": ...}`` rather than raised, and the
+    previous local state is left untouched on disk.
+    """
+    if get_execution_mode() == MODE_PAPER:
+        return None
+
+    def _load_json(path: Path, default: Any) -> tuple[Any, bool]:
+        """Load local state, tolerating a missing or corrupt file.
+
+        The bool reports whether the file on disk was *parseable*, so the
+        caller can tell "legitimately empty" from "garbage that needs
+        repairing".
+        """
+        try:
+            return json.loads(path.read_text(encoding="utf-8")), True
+        except FileNotFoundError:
+            return default, False
+        except Exception:
+            return default, False
+
+    # ``halted`` raises ExecutionHalted here and live-with-no-client raises
+    # ExecutionError; both are *fatal for trading* but must not crash the
+    # portfolio cycle, so they become an error summary instead.
+    try:
+        client = _execution_client_for_ledger(base_currency)
+    except Exception as exc:
+        return {"error": f"execution client unavailable: {exc}"}
+    reconcile = getattr(client, "reconcile", None)
+    if reconcile is None:
+        return {"error": f"client {client.name!r} has no reconcile() — Phase 5 unimplemented"}
+    state, _ = _load_json(
+        POSITIONS_LIVE_PATH.parent / "live_reconcile_state.json", {}
+    )
+    last_iso = state.get("last_fill_iso") or state.get("last_reconcile_iso")
+    since_ms = None
+    if last_iso:
+        try:
+            from datetime import datetime, timezone
+
+            dt = datetime.fromisoformat(str(last_iso).replace("Z", "+00:00"))
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            since_ms = int(dt.timestamp() * 1000) - 30_000  # skew guard
+        except (TypeError, ValueError):
+            since_ms = None
+
+    try:
+        new_fills = client.get_fills(since=since_ms)
+    except Exception as exc:  # venue/network error: never kill the cycle
+        return {"error": f"get_fills failed: {exc}"}
+
+    positions, pos_ok = _load_json(POSITIONS_LIVE_PATH, {})
+    ledger, ledger_ok = _load_json(LEDGER_LIVE_PATH, [])
+    # ``*_ok`` is False when the file is missing or corrupt. Those are read
+    # as empty rather than trusted, and repaired on the next successful write.
+    repair = not (pos_ok and ledger_ok)
+
+    try:
+        updated, rows = reconcile(
+            new_fills, positions, cycle=cycle, now_iso=now_iso,
+            coin_ids_by_symbol=coin_ids_by_symbol or {},
+        )
+    except Exception as exc:
+        return {"error": f"reconcile failed: {exc}"}
+
+    # Deduped count: what actually landed this cycle. `len(rows)` is what
+    # the venue handed back, which the overlap window can inflate.
+    n_rows_this_cycle = len(rows)
+    if rows:
+        seen_trades: set[str] = set()
+        for row in ledger:
+            tid = row.get("trade_id")
+            if tid:
+                seen_trades.add(str(tid))
+        fresh = [
+            r for r in rows
+            if not r.get("trade_id") or str(r["trade_id"]) not in seen_trades
+        ]
+        n_rows_this_cycle = len(fresh)
+        ledger.extend(fresh)
+        try:
+            OUTPUT_DIR.mkdir(exist_ok=True)
+            (POSITIONS_LIVE_PATH).write_text(
+                json.dumps(updated, ensure_ascii=False, indent=2), encoding="utf-8"
+            )
+            (LEDGER_LIVE_PATH).write_text(
+                json.dumps(ledger, ensure_ascii=False, indent=2), encoding="utf-8"
+            )
+        except Exception as exc:
+            return {"error": f"persisting live ledger failed: {exc}"}
+    elif repair:
+        try:
+            OUTPUT_DIR.mkdir(exist_ok=True)
+            (POSITIONS_LIVE_PATH).write_text(
+                json.dumps(updated, ensure_ascii=False, indent=2), encoding="utf-8"
+            )
+            (LEDGER_LIVE_PATH).write_text(
+                json.dumps(ledger, ensure_ascii=False, indent=2), encoding="utf-8"
+            )
+        except Exception as exc:
+            return {"error": f"persisting live ledger failed: {exc}"}
+
+    # P&L from the reconciled state, using the same snapshot prices the
+    # rest of the cycle already fetched (zero new network calls).
+    snap = risk_snapshot or {}
+    realized = 0.0
+    for row in ledger:
+        val = row.get("realized_pnl")
+        if val is not None:
+            try:
+                realized += float(val)
+            except (TypeError, ValueError):
+                continue
+    invested = 0.0
+    open_positions: list[dict[str, Any]] = []
+    for coin_id, pos in (updated or {}).items():
+        try:
+            qty = float(pos.get("qty") or 0.0)
+        except (TypeError, ValueError):
+            continue
+        if qty <= 0:
+            continue
+        try:
+            px = float((snap.get(coin_id) or {}).get("current_price") or 0.0)
+        except (TypeError, ValueError):
+            px = 0.0
+        try:
+            cost = float(pos.get("avg_cost") or 0.0)
+        except (TypeError, ValueError):
+            cost = 0.0
+        mv = qty * px
+        invested += mv
+        open_positions.append({
+            "coin_id": coin_id, "asset": coin_id.upper(), "qty": qty,
+            "avg_cost": cost, "price": px, "market_value": mv,
+            "unrealized_pnl": (px - cost) * qty if px > 0 and cost > 0 else None,
+        })
+    try:
+        (POSITIONS_LIVE_PATH.parent / "live_reconcile_state.json").write_text(
+            json.dumps(
+                {"last_reconcile_iso": now_iso, "cycle": cycle,
+                 "n_fills": len(new_fills), "n_rows": len(rows)},
+                ensure_ascii=False, indent=2,
+            ),
+            encoding="utf-8",
+        )
+    except Exception:
+        pass
+
+    unrealized = sum(
+        float(p["unrealized_pnl"]) for p in open_positions
+        if p.get("unrealized_pnl") is not None
+    )
+    account = float(account_size or 0.0)
+    return {
+        "mode": "live",
+        "exchange": client.name,
+        "cycle": cycle,
+        "ts": now_iso,
+        "base_currency": base_currency,
+        "realized_pnl": realized,
+        "unrealized_pnl": unrealized,
+        "total_pnl": realized + unrealized,
+        "equity": account + realized + unrealized,
+        "invested": invested,
+        "open_positions": open_positions,
+        "n_trades": len(ledger),
+        "n_fills_this_cycle": len(new_fills),
+        "n_rows_this_cycle": n_rows_this_cycle,
+    }
 
 
 def base_currency_hint() -> str:

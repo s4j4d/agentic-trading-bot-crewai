@@ -376,6 +376,31 @@ class ExecutionClient(abc.ABC):
         watermark. Sourced from the venue's trade history and/or the order
         object's embedded trades — never a fictional direct endpoint."""
 
+    # -- reconciliation -------------------------------------------------------
+
+    def reconcile(
+        self,
+        fills: list[Fill],
+        positions: dict[str, dict[str, float]],
+        *,
+        cycle: int | None = None,
+        now_iso: str | None = None,
+    ) -> tuple[dict[str, dict[str, float]], list[dict[str, Any]]]:
+        """Reconcile a batch of fills into local position state and ledger rows.
+
+        ``fills`` are the new trades since the last reconciliation (already
+        filtered by watermark upstream). ``positions`` is the prior position
+        map ``{coin_id: {"qty": ..., "avg_cost": ...}}``.
+
+        Returns ``(updated_positions, ledger_rows)`` where each ledger row is a
+        dict with keys matching the paper format:
+        ``ts, cycle, coin_id, side, qty, price, amount, realized_pnl, fee``.
+        ``cycle``/``now_iso`` label the rows so the panel can attribute them
+        to a cycle the same way paper does. Implementations may be no-op
+        (paper already owns the ledger inside ``apply_plan``).
+        """
+        return positions, []
+
     # -- optional hooks -----------------------------------------------------
 
     def get_market_constraints(self, symbol: str) -> dict[str, Any]:
