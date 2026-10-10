@@ -63,6 +63,7 @@ from crypto_council_flow.tools.execution_safety import (
     DailyLossBreaker,
     allow_close,
     enforce_exposure_caps,
+    exposure_limit,
 )
 
 _DEFAULT_BASE_URL = "https://apiv2.nobitex.ir"
@@ -866,6 +867,14 @@ class NobitexExecutionClient(ExecutionClient):
             max_single_pct if max_single_pct is not None
             else _pct_from_env("EXECUTION_MAX_SINGLE_PCT", _DEFAULT_MAX_SINGLE_PCT)
         )
+        # Fail loudly on a percent written where a fraction belongs: a 30
+        # "fraction" would arm a 3000% cap that blocks nothing while the
+        # guard looks armed, which is the same as no guard at all.
+        try:
+            exposure_limit(float(account_size or 0.0), max_total_pct)
+            exposure_limit(float(account_size or 0.0), max_single_pct)
+        except ValueError as exc:
+            raise ExecutionError(f"Phase 6 caps misconfigured: {exc}") from exc
         if not dry_run:
             breaker = DailyLossBreaker(
                 account_size, ledger=breaker_ledger or [], now_iso=now_iso,
@@ -939,7 +948,6 @@ class NobitexExecutionClient(ExecutionClient):
             verdict = enforce_exposure_caps(
                 order_dict,
                 account_size=float(account_size or 0.0),
-                free_cash=pre_balances.get(quote, 0.0),
                 holdings=pre_balances,
                 prices={b: (float((snapshot.get(_coin_for(b, b.lower())) or {}).get("current_price") or 0.0)) for b in pre_balances},
                 max_total_pct=max_total_pct,
@@ -1188,6 +1196,14 @@ class NobitexExecutionClient(ExecutionClient):
             coin_fills = by_coin.get(coin_id, [])
 
             # -- 1. one ledger row per fill (paper-shaped) --------------------
+            # A zero cost basis means "bought before this ledger existed"
+            # (a wallet import, or a position the fills do not explain).
+            # Deriving realized P&L from a 0 cost books the entire proceeds
+            # as one enormous *profit*, which flows straight into the
+            # daily-loss breaker and can keep it permanently disarmed. So
+            # refuse to invent a number: the row carries no realized_pnl
+            # and a note saying why, so the operator can see it rather
+            # than trust a figure computed from nothing.
             for f in sorted(coin_fills, key=lambda x: int(x.ts or 0)):
                 qty = abs(float(f.qty or 0.0))
                 price = float(f.price or 0.0)
@@ -1196,7 +1212,7 @@ class NobitexExecutionClient(ExecutionClient):
                 fee = float(f.fee or 0.0)
                 fee_ccy = str(f.fee_currency or "").upper()
                 side = str(f.side or "").lower()
-                ledger.append({
+                row = {
                     "ts": _epoch_ms_to_iso(f.ts) or ts,
                     "cycle": cycle,
                     "coin_id": coin_id,
@@ -1204,13 +1220,26 @@ class NobitexExecutionClient(ExecutionClient):
                     "qty": qty,
                     "price": price,
                     "amount": qty * price,
-                    "realized_pnl": None if side == OrderSide.BUY else qty * (price - cost) - fee_to_quote(fee, fee_ccy, price),
+                    "realized_pnl": None,
                     "fee": fee or None,
                     "fee_currency": fee_ccy or None,
                     "trade_id": f.trade_id,
                     "order_id": f.order_id,
                     "source": "live_fill",
-                })
+                }
+                if side == OrderSide.SELL:
+                    if cost > 0:
+                        row["realized_pnl"] = (
+                            qty * (price - cost)
+                            - fee_to_quote(fee, fee_ccy, price)
+                        )
+                    else:
+                        row["note"] = (
+                            "no cost basis for this coin — realized P&L "
+                            "withheld rather than computed against a 0 cost"
+                        )
+                        row["source"] = "live_fill_no_basis"
+                ledger.append(row)
 
             # -- 2. cost basis from the batch --------------------------------
             bought_qty = sum(

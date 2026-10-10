@@ -7,7 +7,10 @@ they can be unit-tested offline exactly like the rest of the flow:
   priced on the *last known* price while an order is filled at the
   *current* price, and the two can drift enough to breach exposure.
   ``enforce_exposure_caps`` re-checks every order at fill time against
-  wallet balances and downsizes/rejects it.
+  what the wallet *holds* and the current price, and downsizes/rejects
+  it. Free cash is deliberately not modelled: the venue rejects an order
+  bigger than the spendable balance, so affordability is the venue's
+  job while the caps are this guard's.
 * **Daily realized-loss circuit breaker.** ``DailyLossBreaker`` accumulates
   realized P&L per UTC day (from the reconciled ledger) and refuses new
   risk once the day's loss passes ``EXECUTION_MAX_DAILY_LOSS_PCT`` of the
@@ -68,9 +71,15 @@ def _env_float(name: str, default: float | None) -> float | None:
 def exposure_limit(account_size: float, pct: float | None) -> float:
     """Quote-currency cap implied by ``pct`` of ``account_size``.
 
-    ``pct`` is a fraction of the account (0.05 = 5%). ``None`` or a
+    ``pct`` is a *fraction* of the account (0.05 = 5%); ``None`` or a
     negative ``pct`` means uncapped. Returns 0.0 for a non-positive
     account so a misconfigured size can never authorize more risk.
+
+    Raises :class:`ValueError` for ``pct > 1.0``: a fraction above 100%
+    of the account is a units error (a percent written where a fraction
+    belongs, e.g. ``30`` for 30%), and silently accepting it would hand
+    back an inert cap of 3000% — the guard would appear armed while
+    authorizing unlimited risk. Fail loudly instead.
     """
     try:
         account = float(account_size or 0.0)
@@ -78,6 +87,12 @@ def exposure_limit(account_size: float, pct: float | None) -> float:
         return 0.0
     if not math.isfinite(account) or account <= 0 or pct is None or pct < 0:
         return 0.0
+    if pct > 1.0:
+        raise ValueError(
+            f"cap {pct!r} is not a fraction of the account (0.05 = 5%); "
+            "a value above 1.0 looks like a percent written where a "
+            "fraction belongs — refusing to arm an inert cap"
+        )
     return account * pct
 
 
@@ -94,7 +109,6 @@ def enforce_exposure_caps(
     order: dict[str, Any],
     *,
     account_size: float,
-    free_cash: float,
     holdings: dict[str, float] | None = None,
     prices: dict[str, float] | None = None,
     max_total_pct: float | None,
@@ -123,6 +137,12 @@ def enforce_exposure_caps(
     more than the wallet holds — exposure caps never block risk *reduction*.
     The accountable single-position cap is therefore applied to the
     post-trade exposure, which is what a cap on "one position" means.
+
+    ``qty`` in the verdict is the size actually to be placed (0 on a
+    block). ``notional`` is the *post-trade* exposure this verdict
+    accounts for: for a buy that includes what is already held, and for a
+    sell the value being removed. It is a diagnostic for the operator,
+    not a restatement of ``qty * price``.
     """
     side = str(order.get("side") or "").lower()
     symbol = str(order.get("symbol") or "")
@@ -168,9 +188,15 @@ def enforce_exposure_caps(
             }
         notional = qty * price if price > 0 else 0.0
         if notional <= 0:
+            # An unpriced asset cannot be safety-checked, and the guard's job
+            # is to keep bookings *provably* within limits — an asset whose
+            # capacity to hold the account cannot be measured would
+            # be allowed through by skipping the cap check.
             return {
-                "action": "allow", "reason": "unpriced order — venue client sizes it",
-                "qty": qty, "notional": 0.0, "order": order,
+                "action": "block",
+                "reason": (f"no price for {base or symbol} — cannot check "
+                           "exposure against the caps"),
+                "qty": 0.0, "notional": 0.0, "order": order,
             }
 
     total_cap = exposure_limit(account_size, max_total_pct)
@@ -181,7 +207,7 @@ def enforce_exposure_caps(
         if str(p.get("asset") or "").split("-")[0].split("/")[0].strip().upper() != base
     ) if positions else 0.0
 
-    if side == "sell" or (qty > 0 and held_qty > 0 and qty >= held_qty):
+    if allow_close(side):
         # Risk-reducing: never cap. Only the venue's own solvency matters.
         if qty > held_qty > 0:
             return {
@@ -195,6 +221,12 @@ def enforce_exposure_caps(
             "reason": "risk-reducing order (sell) — caps do not apply",
             "qty": qty, "notional": notional, "order": order,
         }
+
+    # A buy is always *adding* risk; an existing position only makes it worse.
+    # The caps below apply to the post-trade exposure, which is what a cap on
+    # "one position" means.
+    held_notional = held_qty * price
+    notional += held_notional
 
     # -- exposure caps, computed post-trade ------------------------------
     post_total = other_holdings + notional
@@ -266,8 +298,9 @@ class DailyLossBreaker:
     still be unwound — an open circuit must not trap a losing position.
 
     Realized P&L is *absolute* quote currency, summed from ledger rows with
-    a ``realized_pnl`` value; ````limit`` is an absolute amount derived
-    from a percentage of the account at construction.
+    a ``realized_pnl`` value; ``limit`` is an absolute amount derived from
+    ``max_daily_loss_pct`` *percent* of the account at construction (5 = 5%
+    of the account, so a 10,000 account breaks at a 500 loss).
     """
 
     def __init__(
@@ -279,14 +312,22 @@ class DailyLossBreaker:
         now_iso: str | None = None,
         state: dict[str, Any] | None = None,
     ) -> None:
-        pct = (
+        pct_raw = (
             max_daily_loss_pct
             if max_daily_loss_pct is not None
             else _env_float("EXECUTION_MAX_DAILY_LOSS_PCT", DEFAULT_MAX_DAILY_LOSS_PCT)
         )
         self.account_size = _to_float(account_size)
-        self.max_daily_loss_pct = pct
-        self.limit = self.account_size * pct if pct is not None and pct >= 0 else 0.0
+        # ``max_daily_loss_pct`` is a *percentage* (5 = 5%), matching the env
+        # knob and the main.py flags, while ``enforce_exposure_caps`` takes
+        # fractions. Convert once here so the two never get mixed up.
+        self.max_daily_loss_pct = _to_float(
+            pct_raw if pct_raw is not None else -1.0, -1.0
+        )
+        if pct_raw is not None and pct_raw >= 0:
+            self.limit = self.account_size * (pct_raw / 100.0)
+        else:
+            self.limit = 0.0
         self._today = _day_key(now_iso)
         self._realized_today = 0.0
         self._rows_today = 0
@@ -361,11 +402,11 @@ class DailyLossBreaker:
             return
         if self._realized_today <= -self.limit:
             raise CircuitBreakerOpen(
-                "daily realized loss {loss:,.2f} reached the {pct:.1%} limit "
+                "daily realized loss {loss:,.2f} reached the {pct}% limit "
                 "({limit:,.2f}) — refusing new orders until the next UTC day "
                 "or a manual reset".format(
                     loss=-self._realized_today,
-                    pct=self.max_daily_loss_pct,
+                    pct=format(self.max_daily_loss_pct, "g"),
                     limit=self.limit,
                 )
             )

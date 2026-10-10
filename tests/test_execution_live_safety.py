@@ -206,7 +206,8 @@ def test_sell_escapes_caps_entirely(tmp_path, monkeypatch):
     )
     assert len(_posted(sess)) == 1
     assert out["errors"] == []
-    assert _posted_bodies(sess)[0]["amount"] > 0
+    # The venue payload carries the sell as a formatted string amount.
+    assert float(_posted_bodies(sess)[0]["amount"]) > 0
 
 
 # ---------------------------------------------------------------------------
@@ -214,7 +215,12 @@ def test_sell_escapes_caps_entirely(tmp_path, monkeypatch):
 # ---------------------------------------------------------------------------
 
 def test_breaker_blocks_entry_when_day_loss_exceeds_limit(tmp_path, monkeypatch):
-    """A 600m realized loss on a 10bn account (5% = 500m) trips the circuit."""
+    """A 600m realized loss on a 10bn account (5% = 500m) trips the circuit.
+
+    The order is deliberately *inside* the caps (300m of a 500m single cap)
+    so only the breaker can refuse it — otherwise the caps would block it
+    first and the test would be silently asserting the wrong guard.
+    """
     sess = FakeSession([FakeResponse(_wallets(btc="0")),
                         FakeResponse({"status": "ok", "order": _ORDER}),
                         FakeResponse(_NO_TRADES)])
@@ -225,13 +231,43 @@ def test_breaker_blocks_entry_when_day_loss_exceeds_limit(tmp_path, monkeypatch)
          "side": "sell", "realized_pnl": -600_000_000.0},
     ]
     out = c.apply_plan(
-        plan=_buy_plan(), risk_snapshot=_snapshot(), account_size=10_000_000_000.0,
+        plan=_buy_plan(target=300_000_000.0), risk_snapshot=_snapshot(),
+        account_size=10_000_000_000.0,
         base_currency="rls", now_iso=_NOW, cycle=1, breaker_ledger=ledger,
         max_total_pct=0.30, max_single_pct=0.05,
     )
     assert _posted(sess) == []
     assert out["orders"] == []
     assert any("circuit breaker" in e["error"] for e in out["errors"])
+
+
+def test_breaker_refusals_are_not_reported_as_cap_refusals(
+    tmp_path, monkeypatch
+):
+    """The two guards must stay distinguishable in the error log.
+
+    Both refuse the order, but a cap refusal and a breaker refusal need
+    completely different operator responses, so their reasons must not be
+    conflated into one generic message.
+    """
+    sess = FakeSession([FakeResponse(_wallets(btc="0")),
+                        FakeResponse({"status": "ok", "order": _ORDER}),
+                        FakeResponse(_NO_TRADES)])
+    c = _client(sess)
+    _env(monkeypatch, tmp_path)
+    ledger = [
+        {"ts": "2026-01-01T09:00:00+00:00", "coin_id": "bitcoin",
+         "side": "sell", "realized_pnl": -600_000_000.0},
+    ]
+    out = c.apply_plan(
+        plan=_buy_plan(target=300_000_000.0), risk_snapshot=_snapshot(),
+        account_size=10_000_000_000.0,
+        base_currency="rls", now_iso=_NOW, cycle=1, breaker_ledger=ledger,
+        max_total_pct=0.30, max_single_pct=0.05,
+    )
+    assert len(out["errors"]) == 1
+    assert "caps" not in out["errors"][0]["error"]
+    assert "circuit breaker" in out["errors"][0]["error"]
 
 
 def test_breaker_lets_closes_through(tmp_path, monkeypatch):

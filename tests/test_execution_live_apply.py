@@ -96,6 +96,18 @@ def _posted_urls(sess):
     return [c["url"] for c in sess.calls]
 
 
+def _no_caps() -> dict:
+    """Opt out of Phase 6 caps so these tests exercise translation only.
+
+    Phase 4 owns order *translation* (sizing, dust, fees, skew) and its
+    fixtures post orders worth a large share of a small test account, which
+    the Phase 6 single-position cap correctly refuses. Passing generous
+    caps here keeps each test about one thing: caps are asserted separately
+    in tests/test_execution_live_safety.py.
+    """
+    return {"max_total_pct": 1.0, "max_single_pct": 1.0}
+
+
 # ---------------------------------------------------------------------------
 # dry run — builds orders, posts nothing
 # ---------------------------------------------------------------------------
@@ -163,6 +175,7 @@ def test_apply_plan_places_market_buy_by_delta_qty(tmp_path, monkeypatch):
     out = c.apply_plan(
         plan=plan, risk_snapshot=_snapshot(), account_size=2_000_000_000.0,
         base_currency="rls", now_iso="2026-01-01T12:00:00+00:00", cycle=1,
+    **_no_caps(),
     )
     assert any(u.endswith("/market/orders/add") for u in _posted_urls(sess))
     assert len(out["orders"]) == 1
@@ -253,6 +266,7 @@ def test_apply_plan_failure_reconciles_and_continues(tmp_path, monkeypatch):
     out = c.apply_plan(
         plan=plan, risk_snapshot=_snapshot(), account_size=2_000_000_000.0,
         base_currency="rls", now_iso="2026-01-01T12:00:00+00:00", cycle=1,
+    **_no_caps(),
     )
     assert out["orders"] == []
     assert len(out["errors"]) == 1
@@ -284,6 +298,7 @@ def test_apply_plan_fee_from_fills_reduces_equity(tmp_path, monkeypatch):
     out = c.apply_plan(
         plan=plan, risk_snapshot=_snapshot(), account_size=2_000_000_000.0,
         base_currency="rls", now_iso="2026-01-01T12:00:00+00:00", cycle=1,
+    **_no_caps(),
     )
     assert out["n_trades"] == 1
     assert out["fee_total"] == pytest.approx(500000.0)
@@ -373,6 +388,7 @@ def test_apply_plan_base_currency_fee_converted_via_fill_price(
     out = c.apply_plan(
         plan=plan, risk_snapshot=_snapshot(), account_size=2_000_000_000.0,
         base_currency="rls", now_iso="2026-01-01T12:00:00+00:00", cycle=1,
+    **_no_caps(),
     )
     # 0.0001 BTC * 5e9 RLS/BTC = 500,000 RLS
     assert out["fee_total"] == pytest.approx(500000.0)
@@ -402,6 +418,7 @@ def test_apply_plan_unpriced_fee_reported_not_mixed(tmp_path, monkeypatch):
     out = c.apply_plan(
         plan=plan, risk_snapshot=_snapshot(), account_size=2_000_000_000.0,
         base_currency="rls", now_iso="2026-01-01T12:00:00+00:00", cycle=1,
+    **_no_caps(),
     )
     assert out["fee_total"] == pytest.approx(0.0)
     assert len(out["fee_unconverted"]) == 1
@@ -455,6 +472,57 @@ def test_apply_plan_skew_guard_keeps_slightly_early_fill(tmp_path, monkeypatch):
     out = c.apply_plan(
         plan=plan, risk_snapshot=_snapshot(), account_size=2_000_000_000.0,
         base_currency="rls", now_iso="2026-01-01T12:00:00+00:00", cycle=1,
+    **_no_caps(),
     )
     assert out["n_trades"] == 1
     assert out["fee_total"] == pytest.approx(50000.0)
+
+
+def test_default_caps_are_enforced_not_silent(tmp_path, monkeypatch):
+    """Transaction path must pin that the default caps actually apply.
+
+    The six tests above opt out via ``_no_caps()`` because their fixtures
+    deliberately post orders worth ~25% of the test account — the guards
+    were right to refuse those, so the caps live in
+    ``tests/test_execution_live_safety.py``. This guards the one thing
+    ``_no_caps()`` leaves unpinned: that a caller passing *no* caps
+    (``main.py`` on a client that predates the guards, or a standalone
+    client) still gets the 5% default applied, rather than an unlimited
+    client.
+    """
+    sess = FakeSession([FakeResponse(_WALLETS),
+                        FakeResponse({"status": "ok", "order": _ORDER}),
+                        FakeResponse({"status": "ok", "trades": []})])
+    c = _client(sess)
+    _env(monkeypatch, tmp_path)
+    # ~50% of a 10bn account, so the 5% default single cap blocks it.
+    plan = {"actions": [
+        {"coin_id": "bitcoin", "symbol": "BTC", "action": "increase",
+         "current": 0.0, "target": 5_000_000_000.0},
+    ]}
+    out = c.apply_plan(
+        plan=plan, risk_snapshot=_snapshot(), account_size=10_000_000_000.0,
+        base_currency="rls", now_iso="2026-01-01T12:00:00+00:00", cycle=1,
+    )
+    # The wallets + trades lookups run before the guard; an order POST
+    # does not, so nothing reached the venue's order endpoint.
+    assert not any("/market/orders/add" in u for u in _posted_urls(sess))
+    assert any("caps" in e["error"] for e in out["errors"])
+
+
+def test_misconfigured_caps_raise_rather_than_arm_an_inert_cap(monkeypatch):
+    """A percent written where a fraction belongs must fail loudly.
+
+    ``30`` for 30% arms a 3000% "cap" that blocks nothing while looking
+    perfectly armed — the worst outcome a safety system can have. Better
+    to refuse the order than to pretend the guard exists.
+    """
+    sess = FakeSession([])
+    c = _client(sess)
+    with pytest.raises(Exception, match="misconfigured"):
+        c.apply_plan(
+            plan={"actions": []}, risk_snapshot=_snapshot(),
+            account_size=10_000_000_000.0,
+            base_currency="rls", now_iso="2026-01-01T12:00:00+00:00",
+            cycle=1, max_total_pct=30.0, max_single_pct=5.0,
+        )

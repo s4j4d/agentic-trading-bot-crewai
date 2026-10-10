@@ -105,6 +105,28 @@ def _fill(**kw):
 # basic fill -> position + ledger rows
 # ---------------------------------------------------------------------------
 
+def test_reconcile_sell_without_a_basis_invents_nothing():
+    """A sell with no cost basis must not fabricate one enormous profit.
+
+    A wallet import (or a position predating the ledger) leaves avg_cost
+    at 0. Booking ``qty * (price - 0)`` would report the entire proceeds
+    as one huge *profit*, which flows into the daily-loss breaker and can
+    keep it permanently disarmed. So the row is emitted with no
+    realized_pnl and a note saying why.
+    """
+    sess = FakeSession([_wallets(btc=0.0, rls=1_000_000_000.0)])
+    c = _client(sess)
+    positions, rows = c.reconcile(
+        [_fill(side="sell")], {}, cycle=1, now_iso="2026-01-01T12:00:00+00:00",
+    )
+    assert rows[0]["side"] == "sell"
+    assert rows[0]["realized_pnl"] is None
+    assert "no cost basis" in rows[0]["note"]
+    assert rows[0]["source"] == "live_fill_no_basis"
+    # The wallet left the position empty, so nothing was kept open.
+    assert positions == {}
+
+
 def test_reconcile_opens_position_from_fills():
     """A buy fill creates a position whose qty comes from the wallet."""
     sess = FakeSession([_wallets(btc=0.01, rls=1_000_000_000.0)])

@@ -350,3 +350,43 @@ def test_reconcile_realized_pnl_sums_the_ledger(live_wiring):
     )
     assert out["realized_pnl"] == pytest.approx(9_970_000.0)
     assert out["equity"] == pytest.approx(1_000_000_000.0 + 9_970_000.0)
+
+
+# ---------------------------------------------------------------------------
+# Phase 6: guard refusals must not be invisible in live mode
+# ---------------------------------------------------------------------------
+
+def test_guard_refusals_surface_on_the_summary():
+    """A blocked order must not look like a filled one.
+
+    In live mode the reconciliation round-trip *replaces* the summary
+    ``apply_plan`` returned, so without this annotation a refused order
+    disappears: the panel shows equity as if the plan had been executed.
+    Every refusal is counted and noted instead.
+    """
+    summary = {"realized_pnl": 0.0, "errors": [
+        {"coin_id": "bitcoin", "symbol": "BTC-RLS",
+         "error": "blocked by Phase 6 caps: single-position cap (5.0%)"},
+        {"coin_id": "ethereum", "symbol": "ETH-RLS",
+         "error": "blocked by Phase 6 caps: no price"},
+    ]}
+    refusals = main._annotate_guard_refusals(summary)
+    assert len(refusals) == 2
+    assert summary["guard_refusals"] == 2
+    assert "2 order(s) refused" in summary["live_note"]
+
+
+def test_no_refusals_leaves_the_summary_untouched():
+    """A fully filled plan must not gain refusal keys."""
+    summary = {"realized_pnl": 0.0}
+    main._annotate_guard_refusals(summary)
+    assert "guard_refusals" not in summary
+    assert "live_note" not in summary
+
+
+def test_a_refusal_without_a_coin_id_still_counts():
+    """Symbol-only refusals (no symbol mapping) are still visible."""
+    summary = {"errors": [{"symbol": "BTC-RLS", "error": "no price"}]}
+    refusals = main._annotate_guard_refusals(summary)
+    assert len(refusals) == 1
+    assert summary["guard_refusals"] == 1

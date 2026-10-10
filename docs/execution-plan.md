@@ -123,33 +123,92 @@ Tests: `tests/test_execution_reconcile.py` (14),
 `tests/test_reconcile_live_wiring.py` (11),
 `tests/test_portfolio_panel_live.py` (19).
 
-## Phase 6 — Safety & Go-Live Controls ❌ NOT STARTED
+## Phase 6 — Safety & Go-Live Controls ✅ DONE
 
-What exists today: the kill switch (`EXECUTION_MODE=halted` raises
-`ExecutionHalted` from the factory; `_reconcile_live_positions` turns it
-into an advisory error summary, trading stops because no client is
-constructed), capital caps as flow-state/CLI inputs enforced in the plan
-(`max_total_exposure_pct=30.0`, `max_single_position_pct=5.0`), key
-hygiene documented in `.env.example` (trade-only keys, no withdrawal,
-IP allowlist, env-only secrets).
+`tools/execution_safety.py` (new, pure/offline, no network or LLM) holds
+two deterministic guards:
 
-What is still missing (the actual Phase 6 work):
+1. **Pre-order capital caps** — `enforce_exposure_caps(order, ...)`
+   re-checks every order *at fill time* against the wallet and the current
+   price, because a plan is priced on the last known price while an order
+   fills at the live one. Verdicts: `allow` / `downsize` (shrinks into the
+   remaining total-cap room) / `block`. **Sells/closes are never capped**
+   (`allow_close(side)`) — de-risking must always stay possible. An
+   unpriced asset is *blocked*, never waved through: an exposure the guard
+   cannot measure is not one it can certify.
+2. **Daily realized-loss circuit breaker** — `DailyLossBreaker(account_size,
+   max_daily_loss_pct, ledger, now_iso)` sums today's realized P&L
+   (`realized_pnl` on ledger rows) per UTC day and refuses new entries past
+   `EXECUTION_MAX_DAILY_LOSS_PCT` (default 5 = 5 *percent* of the account).
+   It **fails closed**: `CircuitBreakerOpen` (an `ExecutionHalted`
+   subclass) is raised at the client boundary, never demoting to paper —
+   "a circuit breaker that demotes you to simulated profits is worse than
+   no breaker". Closes stay allowed so a losing position can always be
+   unwound. `EXECUTION_DRY_RUN` bypasses the breaker (a rehearsal must not
+   be blocked by the circuit).
 
-1. **Pre-order cap enforcement** — caps currently shape the plan, not the
-   order path. `apply_plan` (or a thin guard in front of it) must reject
-   or downsize orders that would breach total/single-position exposure
-   at fill time, since prices move between plan and placement.
-2. **Circuit breaker on daily realized loss** — track realized P&L per
-   UTC day from the ledger; past the limit, refuse new orders (fail
-   closed: raise, do not fall back to paper) until the next day or a
-   manual reset. No implementation exists yet.
-3. **Halted-mode audit** — today halted fails loudly at client
-   construction, which is correct, but there is no explicit test pinning
-   "halted refuses to send orders" at the `apply_plan` boundary, only at
-   reconcile. Add one.
+Wiring: `NobitexExecutionClient.apply_plan(..., max_total_pct=None,
+max_single_pct=None, breaker_ledger=None)` calls both guards before
+`place_order`. Caps are threaded from `main.py`, which owns flow state and
+the ledger paths (`self.state.max_total_exposure_pct / 100.0`,
+`self.state.max_single_position_pct / 100.0`, and
+`_live_breaker_ledger()` — fail-open on I/O, so a corrupt ledger yields
+`[]` and only the caps apply). The client's `_DEFAULT_MAX_TOTAL_PCT = 0.30`
+/ `_DEFAULT_MAX_SINGLE_PCT = 0.05` are standalone fallbacks only.
+Knobs documented: `EXECUTION_MAX_TOTAL_PCT`,
+`EXECUTION_MAX_SINGLE_PCT`, `EXECUTION_MAX_DAILY_LOSS_PCT`.
+
+Fixed while building this (real defects, not test bugs):
+
+* a BUY whose quantity equalled the held quantity was misclassified as
+  risk-reducing and skipped the caps;
+* a buy's exposure now counts the position already held, since a cap on
+  "one position" means post-trade exposure;
+* `DailyLossBreaker` sized its limit in fractions while the env var and
+  every operator reading it talk in **percent** — the default needed a
+  500% daily loss to trip. It now converts percent → fraction once, in the
+  constructor, and `.env.example` agrees;
+* **the cap maths refuses a percent written where a fraction belongs** —
+  `exposure_limit` raises on `pct > 1.0` (a `30` → 3000% cap blocks nothing
+  while looking armed, which is no guard at all), and `apply_plan`
+  converts it to `ExecutionError` rather than arming it;
+* the caps enforce *exposure only*, not affordability: free cash is not
+  modelled because the venue itself rejects an order it cannot fill;
+* **a sell with no cost basis books no P&L.** Reconcile derives `avg_cost`
+  from fills, so a wallet import or a pre-ledger position leaves it at 0,
+  and `qty × (price − 0)` would report the entire proceeds as one enormous
+  *profit* straight into the daily-loss breaker, keeping it permanently
+  disarmed. Such a row is emitted with `realized_pnl: None`, `source:
+  "live_fill_no_basis"` and a note, so the operator sees the gap instead of
+  trusting a number computed from nothing.
+
+Tests: `tests/test_execution_safety.py` (23 unit — pure guards, offline) and
+`tests/test_execution_live_safety.py` (11 at the `apply_plan` boundary
+with a fake session), plus `test_reconcile_sell_without_a_basis_invents_nothing`
+in `tests/test_execution_reconcile.py`. All Phase 6 rejection reasons stay
+distinct in `errors` so a cap refusal and a breaker refusal are never
+conflated. (`tests/test_execution_live_apply.py` opts its six translation
+tests out of the caps via `_no_caps()`: those fixtures deliberately post
+orders worth ~25% of the test account against a default 5% single cap — the
+guard was right to refuse them, and they validate translation, not safety
+limits.)
+
+Wiring fix while wiring it up: `apply_plan`'s `errors` was being dropped in
+live mode — `_reconcile_live_positions()` returns the round-trip summary, so
+a blocked order vanished and the panel showed equity as if the plan had been
+filled. `main._annotate_guard_refusals()` prints each refusal and records
+`guard_refusals` / `live_note` on the summary instead.
+
+The `_no_caps()` opt-out is pinned by `test_default_caps_are_enforced_not_silent`
+(a no-caps caller still gets the 5% default) and
+`test_misconfigured_caps_raise_rather_than_arm_an_inert_cap` (a percent written
+where a fraction belongs raises instead of arming a 3000% "cap").
+
+Still missing (venue-dependent, deferred to Phase 7):
+
 4. **Key-permission check (if the venue allows)** — on startup in live
    mode, verify the key cannot withdraw where the API exposes it; where
-   it doesn't, document the manual checklist. Venue-dependent.
+   it doesn't, document the manual checklist.
 
 ## Phase 7 — Rollout ❌ NOT STARTED (no testnet simplification applies)
 

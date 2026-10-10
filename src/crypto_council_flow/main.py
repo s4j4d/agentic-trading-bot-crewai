@@ -735,6 +735,15 @@ class CryptoCouncilFlow(Flow[CryptoCouncilState]):
                     "matched against wallet balances"
                 )
 
+            # Phase 6: a live order the caps or the breaker refused is
+            # recorded in apply_plan's ``errors`` and reaches no venue.
+            # In paper mode that summary *is* the ledger result, but in live
+            # mode _reconcile_live_positions() returns the round-trip
+            # summary instead, so a blocked order would otherwise be
+            # invisible — the plan would look filled. Print each refusal
+            # and keep the count on the summary so the panel can show it.
+            _annotate_guard_refusals(pnl_summary)
+
             OUTPUT_DIR.mkdir(exist_ok=True)
             snapshot = {
                 "saved_utc": self.state.last_portfolio_utc,
@@ -1014,6 +1023,33 @@ def _execution_client_for_ledger(base_currency: str | None = None):
             quote_currency=base_currency or base_currency_hint(),
         )
     return get_execution_client()
+
+
+def _annotate_guard_refusals(summary: dict[str, Any]) -> list[dict[str, Any]]:
+    """Surface Phase 6 guard refusals on a P&L summary (Phase 6 wiring).
+
+    ``apply_plan`` returns an ``errors`` list of ``{coin_id, symbol,
+    error}`` entries for every order the caps or the daily-loss breaker
+    refused; those orders reached no venue. Paper mode *is* this summary,
+    but live mode replaces it with the reconciliation round-trip, so a
+    blocked order would otherwise be invisible and the plan would look
+    fully filled. Each refusal is printed and counted on the summary, and
+    the list is returned for tests.
+
+    Pure and side-effect-light on purpose: only ``summary`` is mutated,
+    and only when there is something to report.
+    """
+    refusals = list(summary.get("errors") or [])
+    for refusal in refusals:
+        coin = refusal.get("coin_id") or refusal.get("symbol") or "?"
+        print(f"[Live] order refused by safety guard: {coin}: {refusal.get('error')}")
+    if refusals:
+        summary["guard_refusals"] = len(refusals)
+        summary["live_note"] = (
+            f"{len(refusals)} order(s) refused by the Phase 6 caps or the "
+            "daily-loss breaker"
+        )
+    return refusals
 
 
 def _reconcile_live_positions(

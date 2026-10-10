@@ -57,7 +57,7 @@ def _order(**kw):
 def test_buy_within_caps_is_allowed():
     verdict = enforce_exposure_caps(
         _order(notional=50.0, qty=0.01),
-        account_size=10_000.0, free_cash=9_000.0,
+        account_size=10_000.0,
         prices={"BTC": 5_000.0},
         max_total_pct=0.30, max_single_pct=0.05,
     )
@@ -68,7 +68,7 @@ def test_buy_within_caps_is_allowed():
 def test_buy_over_single_cap_is_blocked_not_downsized():
     verdict = enforce_exposure_caps(
         _order(notional=600.0, qty=1.0),
-        account_size=10_000.0, free_cash=9_000.0,
+        account_size=10_000.0,
         prices={"BTC": 600.0},
         max_total_pct=0.30, max_single_pct=0.05,
     )
@@ -80,7 +80,7 @@ def test_buy_over_total_cap_is_blocked():
     existing = [{"asset": "ETH", "qty": 1.0, "price": 2_000.0, "market_value": 2_000.0}]
     verdict = enforce_exposure_caps(
         _order(notional=1_500.0, qty=1.0),
-        account_size=10_000.0, free_cash=9_000.0,
+        account_size=10_000.0,
         positions=existing, prices={"BTC": 1_500.0},
         max_total_pct=0.30, max_single_pct=0.30,
     )
@@ -91,7 +91,7 @@ def test_buy_over_total_cap_is_blocked():
 def test_sells_are_never_exposure_blocked():
     verdict = enforce_exposure_caps(
         _order(side="sell", notional=5_000.0, qty=5.0),
-        account_size=1_000.0, free_cash=0.0,
+        account_size=1_000.0,
         prices={"BTC": 1_000.0},
         max_total_pct=0.01, max_single_pct=0.01,
     )
@@ -102,7 +102,7 @@ def test_sells_are_never_exposure_blocked():
 def test_sell_more_than_held_is_blocked():
     verdict = enforce_exposure_caps(
         _order(side="sell", qty=2.0, notional=100.0),
-        account_size=10_000.0, free_cash=9_000.0,
+        account_size=10_000.0,
         holdings={"BTC": 1.0}, prices={"BTC": 50.0},
         max_total_pct=0.30, max_single_pct=0.30,
     )
@@ -117,13 +117,40 @@ def test_downsize_verdict_exists_for_partial_room():
     existing = [{"asset": "ETH", "qty": 0.5, "price": 1_000.0, "market_value": 500.0}]
     verdict = enforce_exposure_caps(
         _order(notional=2_000.0, qty=2.0),
-        account_size=10_000.0, free_cash=9_000.0,
+        account_size=10_000.0,
         positions=existing, prices={"BTC": 1_000.0},
         max_total_pct=0.30, max_single_pct=1.0,
     )
     assert verdict["action"] == "downsize"
-    assert verdict["notional"] == pytest.approx(500.0)
+    # ``notional`` is the post-trade exposure (held + ordered), while
+    # ``qty`` is the size that can still be placed.
     assert verdict["qty"] == pytest.approx(0.5)
+    assert verdict["notional"] == pytest.approx(500.0)
+
+
+def test_buy_notional_includes_position_already_held():
+    """A cap on one position must mean the post-trade position.
+
+    Holding 0.02 BTC (100 of a 10k account) and buying 0.02 more is a
+    200 position, so a 5% (500) single cap sees 200 — not the 100 that
+    would pass if the holding were ignored.
+    """
+    verdict = enforce_exposure_caps(
+        _order(notional=100.0, qty=0.02),
+        account_size=10_000.0,
+        holdings={"BTC": 0.02}, prices={"BTC": 5_000.0},
+        max_total_pct=1.0, max_single_pct=0.05,
+    )
+    assert verdict["action"] == "allow"
+    assert verdict["notional"] == pytest.approx(200.0)
+
+
+def test_exposure_limit_rejects_a_percent_written_as_a_fraction():
+    """A 5.0 "fraction" must not arm a 500% cap that blocks nothing."""
+    with pytest.raises(ValueError, match="fraction"):
+        exposure_limit(10_000.0, 5.0)
+    # 1.0 is a legitimate 100% cap; only >1 is a units error.
+    assert exposure_limit(10_000.0, 1.0) == 10_000.0
 
 
 # ---------------------------------------------------------------------------
@@ -140,10 +167,10 @@ _LOSING_LEDGER = [
 
 def test_breaker_opens_on_breached_limit():
     breaker = DailyLossBreaker(
-        10_000.0, max_daily_loss_pct=0.05,
+        10_000.0, max_daily_loss_pct=5.0,
         ledger=_LOSING_LEDGER, now_iso=_NOW,
     )
-    # -550 realized vs a 500 limit: open.
+    # -550 realized vs a 500 limit (5% of 10k): open.
     with pytest.raises(CircuitBreakerOpen):
         breaker.guard({"symbol": "BTC-RLS", "side": "buy"}, now_iso=_NOW)
     assert isinstance(breaker.guard.__self__ if hasattr(breaker.guard, "__self__") else breaker,
@@ -152,7 +179,7 @@ def test_breaker_opens_on_breached_limit():
 
 def test_breaker_allows_winning_days():
     winner = DailyLossBreaker(
-        10_000.0, max_daily_loss_pct=0.05,
+        10_000.0, max_daily_loss_pct=5.0,
         ledger=[{"ts": _NOW, "coin_id": "btc", "side": "sell", "realized_pnl": 900.0}],
         now_iso=_NOW,
     )
@@ -161,7 +188,7 @@ def test_breaker_allows_winning_days():
 
 def test_breaker_never_blocks_closes():
     breaker = DailyLossBreaker(
-        10_000.0, max_daily_loss_pct=0.05,
+        10_000.0, max_daily_loss_pct=5.0,
         ledger=_LOSING_LEDGER, now_iso=_NOW,
     )
     breaker.guard({"symbol": "BTC-RLS", "side": "sell"}, now_iso=_NOW)  # no raise
@@ -172,13 +199,13 @@ def test_breaker_ignores_other_days_and_none_rows():
         {"ts": "2025-12-31T23:00:00+00:00", "coin_id": "btc", "side": "sell", "realized_pnl": -9_000.0},
         {"ts": _NOW, "coin_id": "btc", "side": "buy", "realized_pnl": None},
     ]
-    breaker = DailyLossBreaker(10_000.0, max_daily_loss_pct=0.05, ledger=stale, now_iso=_NOW)
+    breaker = DailyLossBreaker(10_000.0, max_daily_loss_pct=5.0, ledger=stale, now_iso=_NOW)
     breaker.guard({"symbol": "BTC-RLS", "side": "buy"}, now_iso=_NOW)  # no raise
 
 
 def test_breaker_resets_next_day():
     breaker = DailyLossBreaker(
-        10_000.0, max_daily_loss_pct=0.05,
+        10_000.0, max_daily_loss_pct=5.0,
         ledger=_LOSING_LEDGER, now_iso=_NOW,
     )
     with pytest.raises(CircuitBreakerOpen):
@@ -192,11 +219,11 @@ def test_breaker_resets_next_day():
 
 def test_breaker_survives_round_trip_state():
     breaker = DailyLossBreaker(
-        10_000.0, max_daily_loss_pct=0.05,
+        10_000.0, max_daily_loss_pct=5.0,
         ledger=_LOSING_LEDGER, now_iso=_NOW,
     )
     restored = DailyLossBreaker(
-        10_000.0, max_daily_loss_pct=0.05,
+        10_000.0, max_daily_loss_pct=5.0,
         state=breaker.to_state(), now_iso=_NOW,
     )
     with pytest.raises(CircuitBreakerOpen):
@@ -217,8 +244,12 @@ def test_breaker_is_fail_closed_not_paper():
 
 
 def test_breaker_default_pct_matches_env_default():
+    """5.0 means 5 *percent*, so a 10k account breaks at a 500 loss."""
     assert DailyLossBreaker(10_000.0, now_iso=_NOW).limit == pytest.approx(
-        10_000.0 * DEFAULT_MAX_DAILY_LOSS_PCT
+        10_000.0 * DEFAULT_MAX_DAILY_LOSS_PCT / 100.0
+    )
+    assert DailyLossBreaker(10_000.0, now_iso=_NOW).max_daily_loss_pct == pytest.approx(
+        DEFAULT_MAX_DAILY_LOSS_PCT
     )
 
 
