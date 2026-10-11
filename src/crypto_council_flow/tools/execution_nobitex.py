@@ -1068,7 +1068,10 @@ class NobitexExecutionClient(ExecutionClient):
             "orders": orders,
             "errors": errors,
             # This cycle's fills only — paper's `n_trades` is cumulative
-            # ledger length, so the two are not comparable.
+            # ledger length, so the two are not comparable. The scope is stated
+            # explicitly so a reader (or the rollout differ) never has to guess
+            # the units of the number from the row's shape.
+            "n_trades_scope": "per_cycle",
             "n_trades": len(fills),
             # Quote-currency fee total. Fees whose currency could not be
             # priced are reported, never silently mixed in.

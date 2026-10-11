@@ -424,6 +424,32 @@ class TestManagePortfolioStep:
         assert flow.state.last_portfolio_utc != ""
         assert flow.state.analysed_coins == []  # reset for next cycle
 
+        # The history row must carry the fields the differ compares (Phase 7):
+        # open_positions (per coin), invested, n_trades, mode — so a paper row
+        # can be compared to a live row without unverifiable gaps.
+        import json
+        history_file = main_mod.OUTPUT_DIR / "portfolio_history.jsonl"
+        assert history_file.exists(), "history row not written"
+        main_row = None
+        for line in history_file.read_text().splitlines():
+            if line.strip():
+                parsed = json.loads(line)
+                if parsed.get("source") == "main":
+                    main_row = parsed
+        assert main_row is not None, "no source=\"main\" row in history"
+        assert main_row["mode"] == "paper"
+        assert "open_positions" in main_row
+        for pos in main_row["open_positions"]:
+            assert set(pos) == {"coin_id", "qty", "market_value"}
+            assert pos["qty"] > 0
+        assert "invested" in main_row
+        assert "n_trades" in main_row
+        assert isinstance(main_row["n_trades"], int)
+        assert main_row["n_trades"] >= 0
+        assert "equity" in main_row
+        assert "n_positions" in main_row
+        assert main_row["n_positions"] == 2  # the plan's two target>0 actions
+
     def test_manage_portfolio_skips_when_no_opportunities(self, monkeypatch):
         from crypto_council_flow.main import CryptoCouncilFlow
         import crypto_council_flow.main as main_mod

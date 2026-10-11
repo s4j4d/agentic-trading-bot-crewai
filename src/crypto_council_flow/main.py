@@ -764,12 +764,21 @@ class CryptoCouncilFlow(Flow[CryptoCouncilState]):
                 json.dumps(snapshot, ensure_ascii=False, indent=2), encoding="utf-8"
             )
             with (OUTPUT_DIR / "portfolio_history.jsonl").open("a", encoding="utf-8") as fh:
+                # Per-coin detail is carried alongside the aggregates so a
+                # paper-vs-live comparison can be verified at all: the live
+                # reconciliation reports its book per coin, and a paper history
+                # that only records ``n_positions`` would make per-coin
+                # divergence permanently unverifiable (Phase 7).
+                # ``invested`` is the same equity-cancelling figure the live
+                # summary carries, so the two artefacts answer the same
+                # questions in the same shape.
                 fh.write(json.dumps({
                     "ts": self.state.last_portfolio_utc,
                     "cycle": self.state.portfolio_cycle,
                     # one row per real cycle; risk_tick rows are marked
                     # source="risk_tick" and are NOT counted as cycles
                     "source": "main",
+                    "mode": get_execution_mode(),
                     "duration_s": round(self.state.last_portfolio_duration_s, 1),
                     "account_size": self.state.account_size,
                     "base_currency": self.state.base_currency,
@@ -784,6 +793,24 @@ class CryptoCouncilFlow(Flow[CryptoCouncilState]):
                     "realized_pnl": pnl_summary.get("realized_pnl", 0.0),
                     "unrealized_pnl": pnl_summary.get("unrealized_pnl", 0.0),
                     "equity": pnl_summary.get("equity", 0.0),
+                    "invested": pnl_summary.get("invested", 0.0),
+                    # ``n_trades`` is the paper ledger's cumulative length —
+                    # one entry per fill ever booked — so it only ever grows.
+                    # It is *not* comparable to the live row's per-cycle
+                    # ``orders`` count, which is why the differ refuses to
+                    # compare them and why the scope is stated explicitly
+                    # rather than guessed from the row's shape.
+                    "n_trades_scope": "cumulative",
+                    "n_trades": pnl_summary.get("n_trades", 0),
+                    "open_positions": [
+                        {
+                            "coin_id": p.get("coin_id"),
+                            "qty": p.get("qty", 0.0),
+                            "market_value": p.get("market_value", 0.0),
+                        }
+                        for p in pnl_summary.get("open_positions", [])
+                        if isinstance(p, dict) and p.get("coin_id")
+                    ],
                 }, ensure_ascii=False) + "\n")
 
             _regenerate_portfolio_panel()

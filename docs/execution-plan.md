@@ -5,9 +5,15 @@ as a first-class, always-available fallback. Everything exchange-specific
 stays behind abstract interfaces so the venue can be swapped without
 touching the crews, the portfolio DTOs, or `main.py`.
 
-Status as of 2026-10-09: **Phases 1–5 implemented, Phase 6 not started,
-Phase 7 partially applicable** (details per phase below).
+Status as of 2026-10-11: **Phases 1–6 implemented and committed
+(`214c3e1`), Phase 7 tooling built** — the differ, the key-permission
+manual checklist, and the instrumentation the rollout needs. The live
+N-cycle run itself is not done: it requires a live, IP-allowlisted key this
+environment does not have.
 See `.env.example` for the live knobs the code actually reads.
+
+Test status: **432 passed, 0 failed** (`pytest tests/ -q
+--ignore=tests/test_backtest_real_flow.py`), of which 40 cover the differ.
 
 ## Conventions (apply to every phase)
 
@@ -210,18 +216,106 @@ Still missing (venue-dependent, deferred to Phase 7):
    mode, verify the key cannot withdraw where the API exposes it; where
    it doesn't, document the manual checklist.
 
-## Phase 7 — Rollout ❌ NOT STARTED (no testnet simplification applies)
+## Phase 7 — Rollout 🔄 PARTIAL (tooling built; the rollout itself needs a live key)
 
-1. Unit-test the translation layer + both clients against a fake
-   (done for existing surface; extend to Phase 6 guards).
-2. ~~Testnet/sandbox integration~~ — N/A for Nobitex (correction 6):
-   single minimum-size real order with immediate close, on a
-   KYC'd key with a min-notional budget floor.
-3. Run `EXECUTION_MODE=live` in parallel with paper for N cycles,
-   diffing plans vs. real fills (paper/live ledger shapes already match,
-   `PAPER_FEE_BPS` makes the comparison fair).
-4. Cut the main loop over only then, keeping `paper` as instant rollback
-   (already one env var away).
+**What Phase 7 needs that this environment cannot supply:** real exchange
+credentials, an IP-allowlisted connection, and N cycles of wall-clock time.
+Nobitex has no testnet/sandbox (correction 6), so steps 2–3 cannot be
+rehearsed offline at all. What *was* built is the tooling that makes the
+rollout verifiable once a live key exists — plus the instrumentation gap the
+rollout would otherwise have exposed.
+
+1. **Unit-test the translation layer + both clients against a fake** ✅
+   Existing coverage extended for Phase 6: caps enforced through
+   `apply_plan`, the daily-loss breaker failing closed, `dry_run` bypassing
+   the breaker, and the default caps still arming when a caller passes none.
+2. ~~**Testnet/sandbox integration**~~ — N/A for Nobitex (correction 6).
+3. **Run `EXECUTION_MODE=live` in parallel with paper for N cycles** 🔄
+   *differ built, rollout not run.* `scripts/rollout_diff.py` compares the two
+   artefacts cycle by cycle and is offline, provider-agnostic, and stdlib-only:
+
+   ```
+   .venv/Scripts/python scripts/rollout_diff.py --output-dir output
+   # exit 0 = no divergence, 1 = divergence, 2 = bad output dir
+   # --json      machine-readable report
+   # --max-qty-rel-tol / --max-cash-rel-tol / --max-order-count-delta  tolerances
+   ```
+
+   It joins on cycle number and reports, per cycle: paper-only cycles (live
+   never logged them — a **fail**), live-only cycles, per-coin quantity
+   divergence, live order count vs paper fill count, equity, and book size.
+
+   **Honesty rules this tool holds itself to** (all pinned by
+   `tests/test_rollout_diff.py`):
+   - A difference is only reported when it is *evidenced*. A missing file,
+     an unreadable row, or an absent metric is itself a finding — never
+     agreement. Silently reading a missing file as empty would pass on no
+     evidence, so `main()` demotes a pass to fail when a file cannot be read.
+   - **Unverifiable is not the same as equal.** The real `portfolio_history`
+     row records only aggregates, so per-coin and order-volume questions
+     cannot be answered from it; those report `per_coin_unverifiable` /
+     `order_count_unverifiable` and the verdict becomes **warn**, never pass.
+   - **A zero quantity is a real position state (flat), not missing data** —
+     but an *absent* coin mentions is not flat. Paper holding 0.01 where live
+     never mentions the coin is a `qty_mismatch`, not a display artefact.
+   - **Cycle numbers restart with the bot**, so `portfolio_history` legitimately
+     reuses them across runs (the current file has 87 rows claiming cycle 1 —
+     the number is recomputed on every run and grows as the bot appends).
+     The join keeps the latest write per number and reports the reuse as
+     `cycle_number_reused` — naming the kept row and the dropped ones, so the
+     keep can be audited — rather than dropping the other rows silently.
+   - `risk_tick` heartbeats are never counted as cycles.
+   - **A field that is present but not a number** (`"n_trades": null`, `"n/a"`,
+     a list, NaN) is *corrupt*: it makes that one check unverifiable rather than
+     being coerced into a comparison, and it must never crash the tool. The
+     units of `n_trades` are a separate question, stated explicitly via
+     `n_trades_scope` (`cumulative` for paper's ledger length, `per_cycle` for
+     live's order list) so a shape guess cannot silently flip the meaning.
+
+   **Instrumentation gap this surfaced:** the paper history row recorded only
+   `n_positions`, so per-coin divergence would have been *permanently*
+   unverifiable even though `execution_paper.py` already computes the full
+   book. `main.py` now writes `open_positions` (per coin: `coin_id`, `qty`,
+   `market_value`), plus `invested`, `n_trades`, `mode` and `n_trades_scope`, so
+   both artefacts answer the same questions in the same shape. Older rows stay
+   readable — absence of detail reports unverifiable instead of agreeing.
+
+   **Verified against the real artefacts** (`python scripts/rollout_diff.py
+   --output-dir output`): verdict **FAIL** with `live_executions.jsonl` absent —
+   the missing live file is itself the finding, and it appears in *both* the
+   text report and the JSON `problems` list. 11 paper-only cycles, one
+   `cycle_number_reused` warn for cycle 1. Exit code is 1, so a CI gate cannot
+   read the missing file as agreement.
+
+4. **Cut the main loop over only then**, keeping `paper` as instant rollback
+   (already one env var away) — **not done**, gated on step 3.
+4b. **Key-permission check** (from Phase 6 "still missing") — **cannot be
+   implemented by API design.** Nobitex keys are created with permission
+   scopes (READ, TRADE, WITHDRAW, DEPOSIT, ADDRESS_BOOK, OTP, VIP_CREDIT)
+   assigned **at creation time**, and the API exposes **no endpoint to query
+   a key's own permissions**. So there is nothing to verify against, and a
+   startup check that always passed would be worse than none. It is a manual
+   checklist instead:
+
+   **Pre-live key checklist (manual, every time)**
+   - [ ] Created with **TRADE** permission only — READ alone cannot place
+         orders, TRADE is required for both reading and trading.
+   - [ ] **No WITHDRAW permission.** Non-negotiable: this is what bounds the
+         damage a leaked or misconfigured key can do.
+   - [ ] **No DEPOSIT / ADDRESS_BOOK / OTP / VIP_CREDIT** permission — none is
+         needed to trade, so granting any of them widens the blast radius for
+         no trading benefit.
+   - [ ] **IP allowlist** covers exactly the host that will run the bot,
+         nothing broader.
+   - [ ] Secrets reach the process only via env vars (`EXECUTION_MODE`,
+         `NOBITEX_API_KEY`, `NOBITEX_SECRET_KEY` or their aliases) — see
+         `.env.example` — never via the repo, a file in `output/`, or a
+         screenshot.
+   - [ ] Before the first live cycle: run with `EXECUTION_MODE=halted` and
+         confirm it refuses, then start paper and confirm the two artefacts
+         (`output/portfolio_history.jsonl` + `output/live_executions.jsonl`)
+         accumulate in step, so the first `rollout_diff` verdict is
+         trustworthy instead of noisy.
 
 ## Open questions (unchanged from the draft)
 
