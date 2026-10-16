@@ -21,11 +21,15 @@ interface method                 Nobitex endpoint                 verb
 min-notional source              ``/v2/options`` (``nobitex.minOrders``) GET
 ===============================  ==============================  =========
 
-Auth: token auth (``Authorization: Token <key>``), matching
-``exchange_base.py``. Nobitex also offers Ed25519 API-key auth
-(``Nobitex-Key`` / ``Nobitex-Signature`` / ``Nobitex-Timestamp``); that is a
-deliberate extension point, not implemented here (it needs a local private key
-and cannot be exercised in tests).
+Auth: two schemes are supported, chosen by which credential is configured.
+``Authorization: Token <token>`` (legacy v2 token auth) is used when only
+an API token is available. When an Ed25519 key pair is configured
+(``EXECUTION_API_KEY`` = public key, ``EXECUTION_API_SECRET`` = private-key
+seed), each request is signed instead — ``Nobitex-Key`` /
+``Nobitex-Signature`` / ``Nobitex-Timestamp`` over
+``timestamp + METHOD + full_path + raw_body`` — per Nobitex's API-key guide.
+The signature is recomputed for every attempt (including retries) because it
+covers a timestamp.
 
 Two correctness rules from the plan are enforced:
   * ``client_order_id`` is NOT treated as an idempotency guarantee — a
@@ -37,12 +41,14 @@ Two correctness rules from the plan are enforced:
 
 from __future__ import annotations
 
+import base64
 import json
 import os
 import time
 from pathlib import Path
 from decimal import Decimal, InvalidOperation, ROUND_DOWN, ROUND_HALF_UP
 from typing import Any
+from urllib.parse import urlencode
 
 import requests
 
@@ -113,6 +119,78 @@ def _pct_from_env(name: str, default: float) -> float:
         return float(raw)
     except (TypeError, ValueError):
         return default
+
+
+# --- Ed25519 API-key auth (Nobitex "API Key" scheme) ------------------------
+# Nobitex documents two authentication schemes:
+#   1. legacy token auth  — ``Authorization: Token <token>``
+#   2. API-key auth       — ``Nobitex-Key`` / ``Nobitex-Signature`` /
+#                            ``Nobitex-Timestamp``, where the signature is
+#                            Ed25519 over ``timestamp + METHOD + full_path +
+#                            raw_body`` and both key and signature are
+#                            URL-safe Base64.
+# The signed string must be byte-identical to what goes on the wire, so the
+# body is serialised once here and reused for signing and sending.
+_ED25519_SKEW_TOLERANCE_S = 30
+
+try:  # pragma: no cover - exercised implicitly by every signing call
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+    from cryptography.hazmat.primitives import serialization
+
+    _HAS_ED25519 = True
+except ImportError:  # pragma: no cover - dependency always present in this venv
+    Ed25519PrivateKey = None  # type: ignore[assignment,misc]
+    _HAS_ED25519 = False
+
+
+def _b64url_decode(value: str) -> bytes:
+    """Decode URL-safe Base64, tolerating missing padding and std alphabet."""
+    raw = value.strip().replace("-", "+").replace("_", "/")
+    return base64.b64decode(raw + "=" * (-len(raw) % 4))
+
+
+def _load_ed25519_private_key(secret: str) -> "Any":
+    """Load an Ed25519 private key from a URL-safe Base64 seed."""
+    if not _HAS_ED25519 or Ed25519PrivateKey is None:
+        raise ExecutionError(
+            "nobitex: Ed25519 signing needs the 'cryptography' package",
+            exchange="nobitex",
+        )
+    try:
+        seed = _b64url_decode(secret)
+        return Ed25519PrivateKey.from_private_bytes(seed)
+    except ExecutionError:
+        raise
+    except Exception as exc:
+        raise ExecutionError(
+            "nobitex: EXECUTION_API_SECRET is not a valid URL-safe Base64 "
+            "Ed25519 private key",
+            exchange="nobitex",
+        ) from exc
+
+
+def _build_signed_body(body: dict | None) -> str:
+    """Serialise a request body exactly as it will be transmitted."""
+    if not body:
+        return ""
+    return json.dumps(body, separators=(",", ":"))
+
+
+def _sign_request(
+    private_key: "Any",
+    method: str,
+    full_path: str,
+    raw_body: str,
+    timestamp: str,
+) -> str:
+    """Return the URL-safe Base64 Ed25519 signature for one request.
+
+    The signed payload is ``timestamp + METHOD + full_path + raw_body`` with
+    no separators, per Nobitex's API-key guide. ``full_path`` includes the
+    query string and ``raw_body`` is the exact bytes sent.
+    """
+    payload = f"{timestamp}{method.upper()}{full_path}{raw_body}".encode()
+    return base64.urlsafe_b64encode(private_key.sign(payload)).decode()
 
 
 def _to_decimal(value: Any) -> Decimal | None:
@@ -197,6 +275,7 @@ class NobitexExecutionClient(ExecutionClient):
     def __init__(
         self,
         api_key: str | None = None,
+        api_secret: str | None = None,
         base_url: str | None = None,
         quote_currency: str | None = None,
         timeout: int | None = None,
@@ -217,8 +296,40 @@ class NobitexExecutionClient(ExecutionClient):
             or os.getenv("EXCHANGE_API_BASE")
             or _DEFAULT_BASE_URL
         ).rstrip("/")
-        self.api_key = api_key or os.getenv("EXECUTION_API_KEY") or os.getenv(
-            "EXCHANGE_API_KEY"
+        # Ed25519 API-key auth: `api_key` becomes Nobitex-Key (the public key
+        # Nobitex shows as `key`), `api_secret` is the private-key seed shown
+        # once at creation time.
+        #
+        # Explicit constructor arguments win as a *pair* and are never merged
+        # with env vars: a caller that passes api_key="TOKEN" without a secret
+        # means token auth, even if EXECUTION_API_SECRET happens to be set in
+        # this process. Mixing the two sources would make the auth mode depend
+        # on ambient environment state rather than on the caller's intent.
+        # Only when *both* credentials come from the constructor, or neither
+        # does, are env vars consulted for the other half.
+        pair_given = api_key is not None or api_secret is not None
+        if pair_given and (api_key is None or api_secret is None):
+            secret, key = api_secret, api_key
+        else:
+            secret = (
+                api_secret
+                if api_secret is not None
+                else os.getenv("EXECUTION_API_SECRET")
+                or os.getenv("EXCHANGE_API_SECRET")
+                or None
+            )
+            key = (
+                api_key
+                or os.getenv("EXECUTION_API_KEY")
+                or os.getenv("EXCHANGE_API_KEY")
+                or None
+            )
+        self.api_key = key
+        self.api_secret = secret
+        self._ed25519_key = (
+            _load_ed25519_private_key(secret)
+            if secret and key
+            else None
         )
         try:
             self.timeout = int(
@@ -248,7 +359,10 @@ class NobitexExecutionClient(ExecutionClient):
         )
 
         self._session = session or requests.Session()
-        if self.api_key:
+        # Legacy token auth only. API-key auth signs each request individually
+        # (a fresh timestamp per call), so it must not live in the shared
+        # session headers — see _request().
+        if self.api_key and not self._ed25519_key:
             self._session.headers.update({"Authorization": f"Token {self.api_key}"})
         # Nobitex asks bots to identify themselves via User-Agent.
         self._session.headers.update(
@@ -282,9 +396,38 @@ class NobitexExecutionClient(ExecutionClient):
         attempts = self.max_retries + 1
         last_error: Exception | None = None
         for attempt in range(attempts):
+            # API-key auth signs every single attempt: the signature covers a
+            # fresh timestamp, and signing the body as the exact bytes sent
+            # keeps the signed string identical to what goes on the wire.
+            headers: dict[str, str] = {}
+            send_kwargs: dict[str, Any] = {}
+            if self._ed25519_key is not None:
+                timestamp = str(int(time.time()))
+                raw_body = _build_signed_body(json_body)
+                full_path = endpoint
+                if params:
+                    full_path += "?" + urlencode(params, doseq=True)
+                signature = _sign_request(
+                    self._ed25519_key, method, full_path, raw_body, timestamp
+                )
+                headers.update(
+                    {
+                        "Nobitex-Key": self.api_key or "",
+                        "Nobitex-Signature": signature,
+                        "Nobitex-Timestamp": timestamp,
+                    }
+                )
+                send_kwargs["data"] = raw_body
+            else:
+                send_kwargs["json"] = json_body
             try:
                 resp = self._session.request(
-                    method, url, json=json_body, params=params, timeout=self.timeout
+                    method,
+                    url,
+                    params=params,
+                    timeout=self.timeout,
+                    headers=headers or None,
+                    **send_kwargs,
                 )
             except requests.RequestException as exc:
                 last_error = exc

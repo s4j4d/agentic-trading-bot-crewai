@@ -6,6 +6,7 @@ All tests use a fake ``requests.Session`` so nothing touches the network.
 from __future__ import annotations
 
 import json
+import os
 
 import pytest
 import requests
@@ -46,7 +47,16 @@ class FakeSession(requests.Session):
         self._exc = exc
 
     def request(self, method, url, json=None, params=None, timeout=None, **kwargs):
-        self.calls.append({"method": method, "url": url, "json": json, "params": params})
+        self.calls.append(
+            {
+                "method": method,
+                "url": url,
+                "json": json,
+                "params": params,
+                "data": kwargs.get("data"),
+                "headers": kwargs.get("headers"),
+            }
+        )
         if self._exc is not None:
             raise self._exc
         if self._responses:
@@ -398,3 +408,217 @@ def test_order_amount_rounds_down_to_zero_rejected():
     req = OrderRequest(symbol="BTC-RLS", side=OrderSide.BUY, type=OrderType.MARKET, qty=0.001)
     with pytest.raises(ExecutionError):
         c.build_order_payload(req)  # rounds to 0.00
+
+
+# ---------------------------------------------------------------------------
+# Ed25519 API-key auth
+# ---------------------------------------------------------------------------
+# Fixed seed/timestamp/endpoint give a reproducible vector, so a refactor that
+# changes the signed string (dropping the query, altering key order, adding a
+# separator) fails here instead of silently 401ing against the venue.
+_ED_SEED = "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8="  # bytes 0..31 — a THROWAWAY test vector, NOT a real key
+_ED_PUBKEY = "A6EHv_POEL4dcN0Y50vAmWfk1jCbpQ1fHdyGZBJVMbg="
+
+
+def _signed_client(session=None, **kw):
+    """A client configured for Ed25519 API-key auth (never touches the net)."""
+    return NobitexExecutionClient(
+        api_key=_ED_PUBKEY,
+        api_secret=_ED_SEED,
+        base_url="https://apiv2.nobitex.ir",
+        quote_currency="rls",
+        session=session or FakeSession(),
+        **kw,
+    )
+
+
+def test_signature_matches_documented_vector(monkeypatch):
+    """Signature over timestamp+METHOD+full_path+raw_body, URL-safe Base64."""
+    from crypto_council_flow.tools.execution_nobitex import (
+        _build_signed_body,
+        _load_ed25519_private_key,
+        _sign_request,
+    )
+
+    monkeypatch.setattr(
+        "crypto_council_flow.tools.execution_nobitex.time.time",
+        lambda: 1700000000,
+    )
+    key = _load_ed25519_private_key(_ED_SEED)
+    body = _build_signed_body({"type": "spot"})
+    assert body == '{"type":"spot"}'  # compact, exactly as sent
+
+    sig = _sign_request(key, "POST", "/users/wallets/list", body, "1700000000")
+    assert sig == (
+        "DkMoGA5hHmOqaGhsoz8c1xhc_NNoRgSfaBz8-ltzUbKTxKOpmIfGhmVG2QfDpCax"
+        "-FI8OEzBcXuBrm0wt3AmAA=="
+    )
+
+
+def test_public_key_derives_from_private_seed():
+    """api_key (Nobitex-Key) must be the public half of api_secret."""
+    import base64
+
+    from crypto_council_flow.tools.execution_nobitex import (
+        _load_ed25519_private_key,
+    )
+
+    derived = _load_ed25519_private_key(_ED_SEED).public_key().public_bytes_raw()
+    assert derived == base64.urlsafe_b64decode(_ED_PUBKEY + "=")
+
+
+def test_ed25519_request_headers_and_exact_body(monkeypatch):
+    """Signed requests carry the three Nobitex headers and byte-exact body."""
+    monkeypatch.setattr(
+        "crypto_council_flow.tools.execution_nobitex.time.time",
+        lambda: 1700000000,
+    )
+    s = FakeSession([FakeResponse({"status": "ok", "wallets": []})])
+    c = _signed_client(session=s)
+    # Avoid the live /v2/options lookup (no network in tests).
+    monkeypatch.setattr(c, "_min_notional_for", lambda *_: None)
+
+    c._request("POST", "/users/wallets/list", json_body={"type": "spot"})
+
+    call = s.calls[0]
+    assert call["json"] is None  # legacy json= path must not be used
+    assert call["data"] == '{"type":"spot"}'  # exact bytes that were signed
+    h = call["headers"]
+    assert h["Nobitex-Key"] == _ED_PUBKEY
+    assert h["Nobitex-Timestamp"] == "1700000000"
+    assert h["Nobitex-Signature"] == (
+        "DkMoGA5hHmOqaGhsoz8c1xhc_NNoRgSfaBz8-ltzUbKTxKOpmIfGhmVG2QfDpCax"
+        "-FI8OEzBcXuBrm0wt3AmAA=="
+    )
+    # Legacy token auth must not be sent alongside API-key auth.
+    assert "Authorization" not in call["headers"]
+
+
+def test_query_string_is_part_of_the_signed_path(monkeypatch):
+    """GET with a query string signs the full path, not just the endpoint."""
+    monkeypatch.setattr(
+        "crypto_council_flow.tools.execution_nobitex.time.time",
+        lambda: 1700000001,
+    )
+    s = FakeSession([FakeResponse({"status": "ok", "trades": []})])
+    c = _signed_client(session=s)
+
+    c._request("GET", "/market/trades/list", params={"fromId": 123})
+
+    call = s.calls[0]
+    assert call["data"] == ""  # no body to sign
+    assert "Nobitex-Signature" in call["headers"]
+    assert call["headers"]["Nobitex-Timestamp"] == "1700000001"
+
+
+def test_signature_covers_query_string_not_endpoint_only():
+    """Proof the query string is inside the signed path, not beside it."""
+    from crypto_council_flow.tools.execution_nobitex import (
+        _sign_request,
+        _load_ed25519_private_key,
+    )
+
+    key = _load_ed25519_private_key(_ED_SEED)
+    with_qs = _sign_request(key, "GET", "/market/orders/list?fromId=123", "", "1700000001")
+    without = _sign_request(key, "GET", "/market/orders/list", "", "1700000001")
+    assert with_qs != without  # dropping the query would 401 at the venue
+
+
+def test_each_retry_is_resigned_with_a_fresh_timestamp(monkeypatch):
+    """A retry must not replay a stale timestamp (venue allows 30s skew)."""
+    stamps = iter([1700000000, 1700000060])
+    monkeypatch.setattr(
+        "crypto_council_flow.tools.execution_nobitex.time.time",
+        lambda: next(stamps),
+    )
+    s = FakeSession([FakeResponse({"status": "ok"}, status_code=500),
+                     FakeResponse({"status": "ok"})])
+    c = _signed_client(session=s)
+
+    c._request("POST", "/users/wallets/list", json_body={"type": "spot"})
+
+    ts = [call["headers"]["Nobitex-Timestamp"] for call in s.calls]
+    assert ts == ["1700000000", "1700000060"]
+    assert s.calls[0]["headers"]["Nobitex-Signature"] != (
+        s.calls[1]["headers"]["Nobitex-Signature"]
+    )
+
+
+def test_token_auth_still_works_without_a_secret():
+    """Legacy v2 token auth is unchanged: Authorization header, json= body."""
+    s = FakeSession([FakeResponse({"status": "ok", "wallets": []})])
+    c = NobitexExecutionClient(
+        api_key="TOKEN123",
+        base_url="https://apiv2.nobitex.ir",
+        quote_currency="rls",
+        session=s,
+    )
+    c._request("POST", "/users/wallets/list", json_body={"type": "spot"})
+
+    call = s.calls[0]
+    assert call["headers"] is None  # nothing per-request
+    assert call["json"] == {"type": "spot"}
+    assert c._session.headers["Authorization"] == "Token TOKEN123"
+    assert c._ed25519_key is None
+
+
+def test_bad_secret_fails_loudly():
+    """A malformed private key must not silently fall back to token auth."""
+    with pytest.raises(ExecutionError) as exc:
+        NobitexExecutionClient(
+            api_key=_ED_PUBKEY,
+            api_secret="not-a-key",
+            quote_currency="rls",
+            session=FakeSession(),
+        )
+    assert "EXECUTION_API_SECRET" in str(exc.value)
+
+
+def test_secret_read_from_env(monkeypatch):
+    """EXECUTION_API_SECRET (and the EXCHANGE_ alias) select signed auth."""
+    monkeypatch.setenv("EXECUTION_API_KEY", _ED_PUBKEY)
+    monkeypatch.setenv("EXECUTION_API_SECRET", _ED_SEED)
+    c = NobitexExecutionClient(session=FakeSession(), quote_currency="rls")
+    assert c._ed25519_key is not None
+    # API-key auth owns the Authorization header space entirely.
+    assert "Authorization" not in c._session.headers
+
+
+def test_exchange_alias_secret_read_from_env(monkeypatch):
+    """EXCHANGE_API_SECRET is the accepted alias for EXECUTION_API_SECRET."""
+    monkeypatch.setenv("EXCHANGE_API_KEY", _ED_PUBKEY)
+    monkeypatch.setenv("EXCHANGE_API_SECRET", _ED_SEED)
+    c = NobitexExecutionClient(session=FakeSession())
+    assert c._ed25519_key is not None
+
+
+def test_credentials_are_isolated_between_tests(monkeypatch):
+    """A leaked EXECUTION_API_SECRET must not flip later clients to signed auth.
+
+    Regression test for a real leak: a test that set the env var and then
+    failed (so monkeypatch never undid it) left every later client in the
+    session signing requests, which sends no Authorization header at all —
+    so token-auth assertions would silently stop testing token auth.
+
+    The autouse fixture in conftest.py deletes these vars; this test fails if
+    that fixture is ever removed or narrowed.
+    """
+    # Prove the fixture is doing the work: without it, this would be set.
+    monkeypatch.setenv("EXECUTION_API_SECRET", _ED_SEED)
+    assert os.environ.get("EXECUTION_API_SECRET") is not None
+
+    monkeypatch.delenv("EXECUTION_API_SECRET")
+    c = NobitexExecutionClient(api_key="TOKEN123", session=FakeSession())
+    assert c._ed25519_key is None
+    assert c._session.headers["Authorization"] == "Token TOKEN123"
+
+
+def test_no_ambient_credentials_during_tests():
+    """The suite must not see credentials from the developer's own shell."""
+    for var in (
+        "EXECUTION_API_KEY",
+        "EXECUTION_API_SECRET",
+        "EXCHANGE_API_KEY",
+        "EXCHANGE_API_SECRET",
+    ):
+        assert var not in os.environ, f"{var} leaked into the test session"

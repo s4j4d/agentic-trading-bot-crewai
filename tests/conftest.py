@@ -7,6 +7,31 @@ import pytest
 
 
 # ---------------------------------------------------------------------------
+# Credential isolation
+# ---------------------------------------------------------------------------
+
+@pytest.fixture(autouse=True)
+def _isolate_exchange_credentials(monkeypatch):
+    """Keep Nobitex credentials out of every test's environment.
+
+    NobitexExecutionClient picks its auth scheme from env vars, so a leaked
+    ``EXECUTION_API_SECRET`` (a test that failed before ``monkeypatch`` could
+    undo it, or a developer's shell exporting credentials) silently flips
+    unrelated tests into Ed25519 signed mode — which sends no ``Authorization``
+    header at all, so a token-auth test can "pass" without testing token auth.
+
+    Autouse so it applies to the whole suite, including tests added later.
+    """
+    for var in (
+        "EXECUTION_API_KEY",
+        "EXECUTION_API_SECRET",
+        "EXCHANGE_API_KEY",
+        "EXCHANGE_API_SECRET",
+    ):
+        monkeypatch.delenv(var, raising=False)
+
+
+# ---------------------------------------------------------------------------
 # Minimal valid CoinGecko trending response
 # ---------------------------------------------------------------------------
 
