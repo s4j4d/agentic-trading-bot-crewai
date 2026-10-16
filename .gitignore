@@ -10,7 +10,3 @@ memory
 output
 .tmp_crewai_storage/
 
-# Generated knowledge graph — rebuilt by `graphify update .`, never committed.
-# It is derived from the source tree, so it churns on every code change and
-# would drown a code review in generated noise.
-graphify-out/

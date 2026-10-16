@@ -420,6 +420,19 @@
       "source_location": "L163"
     },
     {
+      "id": "src_crypto_council_flow_tools_execution_base_orderstatus",
+      "label": "OrderStatus",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "community": 48,
+      "community_name": "PaperExecutionClient",
+      "file_type": "code",
+      "norm_label": "orderstatus",
+      "source_file": "src/crypto_council_flow/tools/execution_base.py",
+      "source_location": "L78"
+    },
+    {
       "id": "src_crypto_council_flow_tools_execution_paper_paperexecutionclient",
       "label": "PaperExecutionClient",
       "_callable": true,
@@ -860,19 +873,6 @@
       "norm_label": "executionhalted",
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
       "source_location": "L106"
-    },
-    {
-      "id": "src_crypto_council_flow_tools_execution_base_orderstatus",
-      "label": "OrderStatus",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "community": 58,
-      "community_name": "ExecutionError",
-      "file_type": "code",
-      "norm_label": "orderstatus",
-      "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L78"
     },
     {
       "id": "src_crypto_council_flow_tools_execution_base_balance",
@@ -1713,7 +1713,7 @@
       "file_type": "code",
       "norm_label": "_apply_max_hold()",
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L1022"
+      "source_location": "L1024"
     },
     {
       "id": "src_crypto_council_flow_main_apply_sl_tp_hits",
@@ -1725,7 +1725,7 @@
       "file_type": "code",
       "norm_label": "_apply_sl_tp_hits()",
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L981"
+      "source_location": "L983"
     },
     {
       "id": "src_crypto_council_flow_main_atr_snapshot_for",
@@ -1737,7 +1737,7 @@
       "file_type": "code",
       "norm_label": "_atr_snapshot_for()",
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L945"
+      "source_location": "L947"
     },
     {
       "id": "src_crypto_council_flow_main_base_currency_hint",
@@ -1749,7 +1749,7 @@
       "file_type": "code",
       "norm_label": "base_currency_hint()",
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L926"
+      "source_location": "L928"
     },
     {
       "id": "src_crypto_council_flow_main_cryptocouncilflow_manage_portfolio",
@@ -1809,7 +1809,7 @@
       "file_type": "code",
       "norm_label": "_recompute_portfolio_totals()",
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L1157"
+      "source_location": "L1159"
     },
     {
       "id": "src_crypto_council_flow_main_regenerate_portfolio_panel",
@@ -1821,7 +1821,7 @@
       "file_type": "code",
       "norm_label": "_regenerate_portfolio_panel()",
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L931"
+      "source_location": "L933"
     },
     {
       "id": "src_crypto_council_flow_main_update_paper_ledger",
@@ -2829,7 +2829,7 @@
       "file_type": "code",
       "norm_label": "_append_to_consolidated()",
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L1249"
+      "source_location": "L1251"
     },
     {
       "id": "src_crypto_council_flow_main_build_report",
@@ -2841,7 +2841,7 @@
       "file_type": "code",
       "norm_label": "_build_report()",
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L1233"
+      "source_location": "L1235"
     },
     {
       "id": "src_crypto_council_flow_main_cryptocouncilflow_analyse_coins",
@@ -2877,7 +2877,7 @@
       "file_type": "code",
       "norm_label": "_extract_verdict()",
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L1210"
+      "source_location": "L1212"
     },
     {
       "id": "src_crypto_council_flow_main_fmt_dur",
@@ -2913,7 +2913,7 @@
       "file_type": "code",
       "norm_label": "_run_async()",
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L1349"
+      "source_location": "L1351"
     },
     {
       "id": "tests_test_panel_fills_load_panel_mod",
@@ -3729,7 +3729,7 @@
       "file_type": "code",
       "norm_label": "_backfill_risk_levels()",
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L1101"
+      "source_location": "L1103"
     },
     {
       "id": "src_crypto_council_flow_main_sane_levels",
@@ -3741,7 +3741,7 @@
       "file_type": "code",
       "norm_label": "_sane_levels()",
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L1083"
+      "source_location": "L1085"
     },
     {
       "id": "src_crypto_council_flow_main_within_pct",
@@ -3753,7 +3753,7 @@
       "file_type": "code",
       "norm_label": "_within_pct()",
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L1065"
+      "source_location": "L1067"
     },
     {
       "id": "src_crypto_council_flow_main_within_pct_tolerance",
@@ -3765,7 +3765,7 @@
       "file_type": "code",
       "norm_label": "_within_pct_tolerance()",
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L1075"
+      "source_location": "L1077"
     },
     {
       "id": "tests_test_risk_levels_testbackfillrisklevels_test_fills_missing_levels_from_snapshot",
@@ -4356,6 +4356,30 @@
       "source_location": "L101"
     },
     {
+      "id": "src_crypto_council_flow_tools_execution_base_register_execution_client",
+      "label": "register_execution_client()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 48,
+      "community_name": "PaperExecutionClient",
+      "file_type": "code",
+      "norm_label": "register_execution_client()",
+      "source_file": "src/crypto_council_flow/tools/execution_base.py",
+      "source_location": "L412"
+    },
+    {
+      "id": "src_crypto_council_flow_tools_execution_paper_fee_bps_from_env",
+      "label": "_fee_bps_from_env()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 48,
+      "community_name": "PaperExecutionClient",
+      "file_type": "code",
+      "norm_label": "_fee_bps_from_env()",
+      "source_file": "src/crypto_council_flow/tools/execution_paper.py",
+      "source_location": "L55"
+    },
+    {
       "id": "src_crypto_council_flow_tools_execution_paper_iso_to_epoch_ms",
       "label": "_iso_to_epoch_ms()",
       "_callable": true,
@@ -4402,6 +4426,18 @@
       "norm_label": ".get_fills()",
       "source_file": "src/crypto_council_flow/tools/execution_paper.py",
       "source_location": "L408"
+    },
+    {
+      "id": "src_crypto_council_flow_tools_execution_paper_paperexecutionclient_init",
+      "label": ".__init__()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 48,
+      "community_name": "PaperExecutionClient",
+      "file_type": "code",
+      "norm_label": ".__init__()",
+      "source_file": "src/crypto_council_flow/tools/execution_paper.py",
+      "source_location": "L94"
     },
     {
       "id": "src_crypto_council_flow_tools_execution_paper_paperexecutionclient_load_ledger",
@@ -5301,7 +5337,7 @@
       "file_type": "code",
       "norm_label": "kickoff()",
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L1470"
+      "source_location": "L1472"
     },
     {
       "id": "src_crypto_council_flow_main_parse_inputs",
@@ -5313,7 +5349,7 @@
       "file_type": "code",
       "norm_label": "_parse_inputs()",
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L1273"
+      "source_location": "L1275"
     },
     {
       "id": "src_crypto_council_flow_main_risk_levels_for",
@@ -5496,18 +5532,6 @@
       "source_location": "L381"
     },
     {
-      "id": "src_crypto_council_flow_tools_execution_base_executionclient_get_open_orders",
-      "label": ".get_open_orders()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 54,
-      "community_name": "ExecutionClient",
-      "file_type": "code",
-      "norm_label": ".get_open_orders()",
-      "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L368"
-    },
-    {
       "id": "src_crypto_council_flow_tools_execution_base_executionclient_get_order",
       "label": ".get_order()",
       "_callable": true,
@@ -5530,6 +5554,18 @@
       "norm_label": ".__init__()",
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
       "source_location": "L337"
+    },
+    {
+      "id": "src_crypto_council_flow_tools_execution_base_executionclient_place_order",
+      "label": ".place_order()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 54,
+      "community_name": "ExecutionClient",
+      "file_type": "code",
+      "norm_label": ".place_order()",
+      "source_file": "src/crypto_council_flow/tools/execution_base.py",
+      "source_location": "L350"
     },
     {
       "id": "src_crypto_council_flow_tools_execution_base_executionerror_init",
@@ -5649,7 +5685,7 @@
       "file_type": "code",
       "norm_label": "_extract_scout_items()",
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L1181"
+      "source_location": "L1183"
     },
     {
       "id": "tests_test_scout_parse_test_extractor_handles_envelope",
@@ -5733,7 +5769,7 @@
       "file_type": "code",
       "norm_label": ".cancel_order()",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L564"
+      "source_location": "L575"
     },
     {
       "id": "src_crypto_council_flow_tools_execution_nobitex_nobitexexecutionclient_close",
@@ -5745,7 +5781,7 @@
       "file_type": "code",
       "norm_label": ".close()",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L322"
+      "source_location": "L324"
     },
     {
       "id": "src_crypto_council_flow_tools_execution_nobitex_nobitexexecutionclient_get",
@@ -5757,7 +5793,7 @@
       "file_type": "code",
       "norm_label": "._get()",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L319"
+      "source_location": "L321"
     },
     {
       "id": "src_crypto_council_flow_tools_execution_nobitex_nobitexexecutionclient_get_balances",
@@ -5769,7 +5805,7 @@
       "file_type": "code",
       "norm_label": ".get_balances()",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L523"
+      "source_location": "L534"
     },
     {
       "id": "src_crypto_council_flow_tools_execution_nobitex_nobitexexecutionclient_get_fills",
@@ -5781,7 +5817,7 @@
       "file_type": "code",
       "norm_label": ".get_fills()",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L629"
+      "source_location": "L641"
     },
     {
       "id": "src_crypto_council_flow_tools_execution_nobitex_nobitexexecutionclient_get_market_constraints",
@@ -5793,7 +5829,7 @@
       "file_type": "code",
       "norm_label": ".get_market_constraints()",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L354"
+      "source_location": "L356"
     },
     {
       "id": "src_crypto_council_flow_tools_execution_nobitex_nobitexexecutionclient_get_open_orders",
@@ -5805,7 +5841,7 @@
       "file_type": "code",
       "norm_label": ".get_open_orders()",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L611"
+      "source_location": "L623"
     },
     {
       "id": "src_crypto_council_flow_tools_execution_nobitex_nobitexexecutionclient_get_order",
@@ -5817,7 +5853,7 @@
       "file_type": "code",
       "norm_label": ".get_order()",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L584"
+      "source_location": "L596"
     },
     {
       "id": "src_crypto_council_flow_tools_execution_nobitex_nobitexexecutionclient_min_notional_for",
@@ -5829,7 +5865,7 @@
       "file_type": "code",
       "norm_label": "._min_notional_for()",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L375"
+      "source_location": "L377"
     },
     {
       "id": "src_crypto_council_flow_tools_execution_nobitex_nobitexexecutionclient_order_to_result",
@@ -5841,7 +5877,7 @@
       "file_type": "code",
       "norm_label": "._order_to_result()",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L495"
+      "source_location": "L499"
     },
     {
       "id": "src_crypto_council_flow_tools_execution_nobitex_nobitexexecutionclient_place_order",
@@ -5853,7 +5889,7 @@
       "file_type": "code",
       "norm_label": ".place_order()",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L545"
+      "source_location": "L556"
     },
     {
       "id": "src_crypto_council_flow_tools_execution_nobitex_nobitexexecutionclient_post",
@@ -5865,7 +5901,7 @@
       "file_type": "code",
       "norm_label": "._post()",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L311"
+      "source_location": "L313"
     },
     {
       "id": "src_crypto_council_flow_tools_execution_nobitex_nobitexexecutionclient_request",
@@ -5877,7 +5913,7 @@
       "file_type": "code",
       "norm_label": "._request()",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L220"
+      "source_location": "L222"
     },
     {
       "id": "src_crypto_council_flow_tools_execution_nobitex_nobitexexecutionclient_resolve_pair",
@@ -5889,7 +5925,7 @@
       "file_type": "code",
       "norm_label": "._resolve_pair()",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L330"
+      "source_location": "L332"
     },
     {
       "id": "src_crypto_council_flow_tools_execution_nobitex_to_decimal",
@@ -5913,7 +5949,7 @@
       "file_type": "code",
       "norm_label": "_execution_client_for_ledger()",
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L899"
+      "source_location": "L901"
     },
     {
       "id": "src_crypto_council_flow_tools_execution_base_get_execution_client",
@@ -5952,18 +5988,6 @@
       "source_location": "L422"
     },
     {
-      "id": "src_crypto_council_flow_tools_execution_base_register_execution_client",
-      "label": "register_execution_client()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 58,
-      "community_name": "ExecutionError",
-      "file_type": "code",
-      "norm_label": "register_execution_client()",
-      "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L412"
-    },
-    {
       "id": "src_crypto_council_flow_tools_execution_base_registered_clients",
       "label": "registered_clients()",
       "_callable": true,
@@ -5974,30 +5998,6 @@
       "norm_label": "registered_clients()",
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
       "source_location": "L418"
-    },
-    {
-      "id": "src_crypto_council_flow_tools_execution_paper_fee_bps_from_env",
-      "label": "_fee_bps_from_env()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 58,
-      "community_name": "ExecutionError",
-      "file_type": "code",
-      "norm_label": "_fee_bps_from_env()",
-      "source_file": "src/crypto_council_flow/tools/execution_paper.py",
-      "source_location": "L55"
-    },
-    {
-      "id": "src_crypto_council_flow_tools_execution_paper_paperexecutionclient_init",
-      "label": ".__init__()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 58,
-      "community_name": "ExecutionError",
-      "file_type": "code",
-      "norm_label": ".__init__()",
-      "source_file": "src/crypto_council_flow/tools/execution_paper.py",
-      "source_location": "L94"
     },
     {
       "id": "tests_test_execution_nobitex_test_factory_halted_raises",
@@ -6360,16 +6360,16 @@
       "source_location": "L359"
     },
     {
-      "id": "src_crypto_council_flow_tools_execution_base_executionclient_place_order",
-      "label": ".place_order()",
+      "id": "src_crypto_council_flow_tools_execution_base_executionclient_get_open_orders",
+      "label": ".get_open_orders()",
       "_callable": true,
       "_origin": "ast",
       "community": 61,
       "community_name": "OrderResult",
       "file_type": "code",
-      "norm_label": ".place_order()",
+      "norm_label": ".get_open_orders()",
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L350"
+      "source_location": "L368"
     },
     {
       "id": "src_crypto_council_flow_tools_execution_base_orderresult_is_final",
@@ -6657,7 +6657,7 @@
       "file_type": "code",
       "norm_label": ".build_order_payload()",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L425"
+      "source_location": "L427"
     },
     {
       "id": "src_crypto_council_flow_tools_execution_nobitex_nobitexexecutionclient_init",
@@ -6681,7 +6681,7 @@
       "file_type": "code",
       "norm_label": "._last_price()",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L408"
+      "source_location": "L410"
     },
     {
       "id": "src_crypto_council_flow_tools_execution_nobitex_nobitexexecutionclient_round_price",
@@ -6693,7 +6693,7 @@
       "file_type": "code",
       "norm_label": "._round_price()",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L351"
+      "source_location": "L353"
     },
     {
       "id": "src_crypto_council_flow_tools_execution_nobitex_nobitexexecutionclient_round_qty",
@@ -6705,7 +6705,7 @@
       "file_type": "code",
       "norm_label": "._round_qty()",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L347"
+      "source_location": "L349"
     },
     {
       "id": "src_crypto_council_flow_tools_execution_nobitex_quantise",
@@ -7785,7 +7785,7 @@
       "file_type": "code",
       "norm_label": "plot()",
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L1488"
+      "source_location": "L1490"
     },
     {
       "id": "tests_test_portfolio_testmanageportfoliostep_flow_with_opportunities",
@@ -8167,7 +8167,7 @@
       "source_location": ""
     },
     {
-      "id": "src_crypto_council_flow_main_rationale_1028",
+      "id": "src_crypto_council_flow_main_rationale_1030",
       "label": "Force ``close`` on any positioned action held > max_hold_days. Age is derived\u2026",
       "_origin": "ast",
       "community": 10,
@@ -8175,10 +8175,10 @@
       "file_type": "rationale",
       "norm_label": "force ``close`` on any positioned action held > max_hold_days. age is derived...",
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L1028"
+      "source_location": "L1030"
     },
     {
-      "id": "src_crypto_council_flow_main_rationale_1158",
+      "id": "src_crypto_council_flow_main_rationale_1160",
       "label": "Recompute totals deterministically from action targets. The crew's arithmetic\u2026",
       "_origin": "ast",
       "community": 10,
@@ -8186,7 +8186,7 @@
       "file_type": "rationale",
       "norm_label": "recompute totals deterministically from action targets. the crew's arithmetic...",
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L1158"
+      "source_location": "L1160"
     },
     {
       "id": "src_crypto_council_flow_main_rationale_2",
@@ -8255,7 +8255,7 @@
       "source_location": "L870"
     },
     {
-      "id": "src_crypto_council_flow_main_rationale_927",
+      "id": "src_crypto_council_flow_main_rationale_929",
       "label": "Quote currency for the execution client, from env (default usd).",
       "_origin": "ast",
       "community": 10,
@@ -8263,10 +8263,10 @@
       "file_type": "rationale",
       "norm_label": "quote currency for the execution client, from env (default usd).",
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L927"
+      "source_location": "L929"
     },
     {
-      "id": "src_crypto_council_flow_main_rationale_932",
+      "id": "src_crypto_council_flow_main_rationale_934",
       "label": "Run the stdlib panel script after each portfolio cycle. Best-effort.",
       "_origin": "ast",
       "community": 10,
@@ -8274,10 +8274,10 @@
       "file_type": "rationale",
       "norm_label": "run the stdlib panel script after each portfolio cycle. best-effort.",
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L932"
+      "source_location": "L934"
     },
     {
-      "id": "src_crypto_council_flow_main_rationale_946",
+      "id": "src_crypto_council_flow_main_rationale_948",
       "label": "Retry-then-None ATR snapshot from cached OHLC (pure read, no LLM). Uses the\u2026",
       "_origin": "ast",
       "community": 10,
@@ -8285,10 +8285,10 @@
       "file_type": "rationale",
       "norm_label": "retry-then-none atr snapshot from cached ohlc (pure read, no llm). uses the...",
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L946"
+      "source_location": "L948"
     },
     {
-      "id": "src_crypto_council_flow_main_rationale_985",
+      "id": "src_crypto_council_flow_main_rationale_987",
       "label": "Force ``close`` on positions whose stop/take was hit. Deterministic, no LLM:\u2026",
       "_origin": "ast",
       "community": 10,
@@ -8296,7 +8296,7 @@
       "file_type": "rationale",
       "norm_label": "force ``close`` on positions whose stop/take was hit. deterministic, no llm:...",
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L985"
+      "source_location": "L987"
     },
     {
       "id": "src_crypto_council_flow_tools_scout_tools",
@@ -10363,7 +10363,7 @@
       "source_location": ""
     },
     {
-      "id": "src_crypto_council_flow_main_rationale_1211",
+      "id": "src_crypto_council_flow_main_rationale_1213",
       "label": "Pull a short verdict excerpt from the tail of an analysis report.\u2026",
       "_origin": "ast",
       "community": 20,
@@ -10371,10 +10371,10 @@
       "file_type": "rationale",
       "norm_label": "pull a short verdict excerpt from the tail of an analysis report....",
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L1211"
+      "source_location": "L1213"
     },
     {
-      "id": "src_crypto_council_flow_main_rationale_1234",
+      "id": "src_crypto_council_flow_main_rationale_1236",
       "label": "Wrap the crew's raw analysis output with a scout context header.",
       "_origin": "ast",
       "community": 20,
@@ -10382,10 +10382,10 @@
       "file_type": "rationale",
       "norm_label": "wrap the crew's raw analysis output with a scout context header.",
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L1234"
+      "source_location": "L1236"
     },
     {
-      "id": "src_crypto_council_flow_main_rationale_1253",
+      "id": "src_crypto_council_flow_main_rationale_1255",
       "label": "Append a single coin's analysis to the consolidated results file.",
       "_origin": "ast",
       "community": 20,
@@ -10393,10 +10393,10 @@
       "file_type": "rationale",
       "norm_label": "append a single coin's analysis to the consolidated results file.",
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L1253"
+      "source_location": "L1255"
     },
     {
-      "id": "src_crypto_council_flow_main_rationale_1359",
+      "id": "src_crypto_council_flow_main_rationale_1361",
       "label": "Outer async scheduler. Scout cadence: every SCOUT_INTERVAL_SECONDS (2 hours)\u2026",
       "_origin": "ast",
       "community": 20,
@@ -10404,7 +10404,7 @@
       "file_type": "rationale",
       "norm_label": "outer async scheduler. scout cadence: every scout_interval_seconds (2 hours)...",
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L1359"
+      "source_location": "L1361"
     },
     {
       "id": "src_crypto_council_flow_main_rationale_225",
@@ -12423,7 +12423,7 @@
       "source_location": "L1"
     },
     {
-      "id": "src_crypto_council_flow_main_rationale_1076",
+      "id": "src_crypto_council_flow_main_rationale_1078",
       "label": "Crew SL/TP tolerance around the computed ATR levels (env-overridable).",
       "_origin": "ast",
       "community": 42,
@@ -12431,10 +12431,10 @@
       "file_type": "rationale",
       "norm_label": "crew sl/tp tolerance around the computed atr levels (env-overridable).",
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L1076"
+      "source_location": "L1078"
     },
     {
-      "id": "src_crypto_council_flow_main_rationale_1086",
+      "id": "src_crypto_council_flow_main_rationale_1088",
       "label": "Structural check: stop must sit on the loss side of entry and take on the\u2026",
       "_origin": "ast",
       "community": 42,
@@ -12442,10 +12442,10 @@
       "file_type": "rationale",
       "norm_label": "structural check: stop must sit on the loss side of entry and take on the...",
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L1086"
+      "source_location": "L1088"
     },
     {
-      "id": "src_crypto_council_flow_main_rationale_1104",
+      "id": "src_crypto_council_flow_main_rationale_1106",
       "label": "Anchor each action's stop/take to the deterministic ATR set. Per action, the\u2026",
       "_origin": "ast",
       "community": 42,
@@ -12453,7 +12453,7 @@
       "file_type": "rationale",
       "norm_label": "anchor each action's stop/take to the deterministic atr set. per action, the...",
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L1104"
+      "source_location": "L1106"
     },
     {
       "id": "tests_test_risk_levels_rationale_75",
@@ -12980,6 +12980,28 @@
       "source_location": "L71"
     },
     {
+      "id": "clientfactory",
+      "label": "_ClientFactory",
+      "_origin": "ast",
+      "community": 48,
+      "community_name": "PaperExecutionClient",
+      "file_type": "code",
+      "norm_label": "_clientfactory",
+      "source_file": "",
+      "source_location": ""
+    },
+    {
+      "id": "src_crypto_council_flow_tools_execution_paper",
+      "label": "execution_paper.py",
+      "_origin": "ast",
+      "community": 48,
+      "community_name": "PaperExecutionClient",
+      "file_type": "code",
+      "norm_label": "execution_paper.py",
+      "source_file": "src/crypto_council_flow/tools/execution_paper.py",
+      "source_location": "L1"
+    },
+    {
       "id": "src_crypto_council_flow_tools_execution_paper_py_any",
       "label": "Any",
       "_origin": "ast",
@@ -12989,6 +13011,39 @@
       "norm_label": "any",
       "source_file": "",
       "source_location": ""
+    },
+    {
+      "id": "src_crypto_council_flow_tools_execution_paper_py_path",
+      "label": "Path",
+      "_origin": "ast",
+      "community": 48,
+      "community_name": "PaperExecutionClient",
+      "file_type": "code",
+      "norm_label": "path",
+      "source_file": "",
+      "source_location": ""
+    },
+    {
+      "id": "src_crypto_council_flow_tools_execution_base_rationale_413",
+      "label": "Register a client factory under ``name`` (matched against EXECUTION_MODE for\u2026",
+      "_origin": "ast",
+      "community": 48,
+      "community_name": "PaperExecutionClient",
+      "file_type": "rationale",
+      "norm_label": "register a client factory under ``name`` (matched against execution_mode for...",
+      "source_file": "src/crypto_council_flow/tools/execution_base.py",
+      "source_location": "L413"
+    },
+    {
+      "id": "src_crypto_council_flow_tools_execution_paper_rationale_1",
+      "label": "Paper (simulated) execution client. The paper ledger predates the execution\u2026",
+      "_origin": "ast",
+      "community": 48,
+      "community_name": "PaperExecutionClient",
+      "file_type": "rationale",
+      "norm_label": "paper (simulated) execution client. the paper ledger predates the execution...",
+      "source_file": "src/crypto_council_flow/tools/execution_paper.py",
+      "source_location": "L1"
     },
     {
       "id": "src_crypto_council_flow_tools_execution_paper_rationale_157",
@@ -13743,7 +13798,7 @@
       "source_location": "L1"
     },
     {
-      "id": "src_crypto_council_flow_main_rationale_1274",
+      "id": "src_crypto_council_flow_main_rationale_1276",
       "label": "Parse CLI arguments into Flow inputs. Accepted flags: --account-size <float>\u2026",
       "_origin": "ast",
       "community": 53,
@@ -13751,10 +13806,10 @@
       "file_type": "rationale",
       "norm_label": "parse cli arguments into flow inputs. accepted flags: --account-size <float>...",
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L1274"
+      "source_location": "L1276"
     },
     {
-      "id": "src_crypto_council_flow_main_rationale_1471",
+      "id": "src_crypto_council_flow_main_rationale_1473",
       "label": "Primary entry point \u2014 starts the continuous Flow scheduler.",
       "_origin": "ast",
       "community": 53,
@@ -13762,7 +13817,7 @@
       "file_type": "rationale",
       "norm_label": "primary entry point \u2014 starts the continuous flow scheduler.",
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L1471"
+      "source_location": "L1473"
     },
     {
       "id": "src_crypto_council_flow_main_rationale_838",
@@ -13831,6 +13886,17 @@
       "source_location": "L345"
     },
     {
+      "id": "src_crypto_council_flow_tools_execution_base_rationale_351",
+      "label": "Submit an order. Raises ``ExecutionError`` on rejection/failure.\u2026",
+      "_origin": "ast",
+      "community": 54,
+      "community_name": "ExecutionClient",
+      "file_type": "rationale",
+      "norm_label": "submit an order. raises ``executionerror`` on rejection/failure....",
+      "source_file": "src/crypto_council_flow/tools/execution_base.py",
+      "source_location": "L351"
+    },
+    {
       "id": "src_crypto_council_flow_tools_execution_base_rationale_364",
       "label": "Return one order's current state, or None if the venue has no record of it\u2026",
       "_origin": "ast",
@@ -13840,17 +13906,6 @@
       "norm_label": "return one order's current state, or none if the venue has no record of it...",
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
       "source_location": "L364"
-    },
-    {
-      "id": "src_crypto_council_flow_tools_execution_base_rationale_369",
-      "label": "List live (unfilled/partially filled) orders.",
-      "_origin": "ast",
-      "community": 54,
-      "community_name": "ExecutionClient",
-      "file_type": "rationale",
-      "norm_label": "list live (unfilled/partially filled) orders.",
-      "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L369"
     },
     {
       "id": "src_crypto_council_flow_tools_execution_base_rationale_375",
@@ -13952,7 +14007,7 @@
       "source_location": "L1"
     },
     {
-      "id": "src_crypto_council_flow_main_rationale_1182",
+      "id": "src_crypto_council_flow_main_rationale_1184",
       "label": "Best-effort extraction of opportunity dicts from raw scout text. Handles the\u2026",
       "_origin": "ast",
       "community": 56,
@@ -13960,7 +14015,7 @@
       "file_type": "rationale",
       "norm_label": "best-effort extraction of opportunity dicts from raw scout text. handles the...",
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L1182"
+      "source_location": "L1184"
     },
     {
       "id": "tests_test_scout_parse_rationale_1",
@@ -14018,7 +14073,7 @@
       "source_location": "L132"
     },
     {
-      "id": "src_crypto_council_flow_tools_execution_nobitex_rationale_229",
+      "id": "src_crypto_council_flow_tools_execution_nobitex_rationale_231",
       "label": "Call the venue, normalise every failure into ``ExecutionError``.\u2026",
       "_origin": "ast",
       "community": 57,
@@ -14026,10 +14081,10 @@
       "file_type": "rationale",
       "norm_label": "call the venue, normalise every failure into ``executionerror``....",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L229"
+      "source_location": "L231"
     },
     {
-      "id": "src_crypto_council_flow_tools_execution_nobitex_rationale_331",
+      "id": "src_crypto_council_flow_tools_execution_nobitex_rationale_333",
       "label": "Translate ``symbol`` into Nobitex's (srcCurrency, dstCurrency) pair. Accepts\u2026",
       "_origin": "ast",
       "community": 57,
@@ -14037,10 +14092,10 @@
       "file_type": "rationale",
       "norm_label": "translate ``symbol`` into nobitex's (srccurrency, dstcurrency) pair. accepts...",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L331"
+      "source_location": "L333"
     },
     {
-      "id": "src_crypto_council_flow_tools_execution_nobitex_rationale_355",
+      "id": "src_crypto_council_flow_tools_execution_nobitex_rationale_357",
       "label": "Local precision/min-notional for a symbol. Nobitex does not publish per-pair\u2026",
       "_origin": "ast",
       "community": 57,
@@ -14048,10 +14103,10 @@
       "file_type": "rationale",
       "norm_label": "local precision/min-notional for a symbol. nobitex does not publish per-pair...",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L355"
+      "source_location": "L357"
     },
     {
-      "id": "src_crypto_council_flow_tools_execution_nobitex_rationale_376",
+      "id": "src_crypto_council_flow_tools_execution_nobitex_rationale_378",
       "label": "Minimum order value for a quote currency (env override wins). Order of\u2026",
       "_origin": "ast",
       "community": 57,
@@ -14059,10 +14114,10 @@
       "file_type": "rationale",
       "norm_label": "minimum order value for a quote currency (env override wins). order of...",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L376"
+      "source_location": "L378"
     },
     {
-      "id": "src_crypto_council_flow_tools_execution_nobitex_rationale_496",
+      "id": "src_crypto_council_flow_tools_execution_nobitex_rationale_500",
       "label": "Map a Nobitex order object to a normalized ``OrderResult``.",
       "_origin": "ast",
       "community": 57,
@@ -14070,10 +14125,10 @@
       "file_type": "rationale",
       "norm_label": "map a nobitex order object to a normalized ``orderresult``.",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L496"
+      "source_location": "L500"
     },
     {
-      "id": "src_crypto_council_flow_tools_execution_nobitex_rationale_524",
+      "id": "src_crypto_council_flow_tools_execution_nobitex_rationale_535",
       "label": "Spot wallet balances via ``POST /users/wallets/list``. ``free`` is the active\u2026",
       "_origin": "ast",
       "community": 57,
@@ -14081,10 +14136,10 @@
       "file_type": "rationale",
       "norm_label": "spot wallet balances via ``post /users/wallets/list``. ``free`` is the active...",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L524"
+      "source_location": "L535"
     },
     {
-      "id": "src_crypto_council_flow_tools_execution_nobitex_rationale_546",
+      "id": "src_crypto_council_flow_tools_execution_nobitex_rationale_557",
       "label": "Submit a spot order via ``POST /market/orders/add``. Never blind-retries on a\u2026",
       "_origin": "ast",
       "community": 57,
@@ -14092,10 +14147,10 @@
       "file_type": "rationale",
       "norm_label": "submit a spot order via ``post /market/orders/add``. never blind-retries on a...",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L546"
+      "source_location": "L557"
     },
     {
-      "id": "src_crypto_council_flow_tools_execution_nobitex_rationale_565",
+      "id": "src_crypto_council_flow_tools_execution_nobitex_rationale_576",
       "label": "Cancel an open order via ``POST /market/orders/update-status``.",
       "_origin": "ast",
       "community": 57,
@@ -14103,10 +14158,10 @@
       "file_type": "rationale",
       "norm_label": "cancel an open order via ``post /market/orders/update-status``.",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L565"
+      "source_location": "L576"
     },
     {
-      "id": "src_crypto_council_flow_tools_execution_nobitex_rationale_585",
+      "id": "src_crypto_council_flow_tools_execution_nobitex_rationale_597",
       "label": "Look up one order via ``POST /market/orders/status``. Numeric ``order_id`` is\u2026",
       "_origin": "ast",
       "community": 57,
@@ -14114,10 +14169,10 @@
       "file_type": "rationale",
       "norm_label": "look up one order via ``post /market/orders/status``. numeric ``order_id`` is...",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L585"
+      "source_location": "L597"
     },
     {
-      "id": "src_crypto_council_flow_tools_execution_nobitex_rationale_612",
+      "id": "src_crypto_council_flow_tools_execution_nobitex_rationale_624",
       "label": "List live orders via ``GET /market/orders/list`` (``status=open``).\u2026",
       "_origin": "ast",
       "community": 57,
@@ -14125,10 +14180,10 @@
       "file_type": "rationale",
       "norm_label": "list live orders via ``get /market/orders/list`` (``status=open``)....",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L612"
+      "source_location": "L624"
     },
     {
-      "id": "src_crypto_council_flow_tools_execution_nobitex_rationale_632",
+      "id": "src_crypto_council_flow_tools_execution_nobitex_rationale_644",
       "label": "Executed trades via ``GET /market/trades/list`` (spot, 180 days). ``since``\u2026",
       "_origin": "ast",
       "community": 57,
@@ -14136,18 +14191,7 @@
       "file_type": "rationale",
       "norm_label": "executed trades via ``get /market/trades/list`` (spot, 180 days). ``since``...",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L632"
-    },
-    {
-      "id": "clientfactory",
-      "label": "_ClientFactory",
-      "_origin": "ast",
-      "community": 58,
-      "community_name": "ExecutionError",
-      "file_type": "code",
-      "norm_label": "_clientfactory",
-      "source_file": "",
-      "source_location": ""
+      "source_location": "L644"
     },
     {
       "id": "runtimeerror",
@@ -14172,29 +14216,7 @@
       "source_location": "L1"
     },
     {
-      "id": "src_crypto_council_flow_tools_execution_paper",
-      "label": "execution_paper.py",
-      "_origin": "ast",
-      "community": 58,
-      "community_name": "ExecutionError",
-      "file_type": "code",
-      "norm_label": "execution_paper.py",
-      "source_file": "src/crypto_council_flow/tools/execution_paper.py",
-      "source_location": "L1"
-    },
-    {
-      "id": "src_crypto_council_flow_tools_execution_paper_py_path",
-      "label": "Path",
-      "_origin": "ast",
-      "community": 58,
-      "community_name": "ExecutionError",
-      "file_type": "code",
-      "norm_label": "path",
-      "source_file": "",
-      "source_location": ""
-    },
-    {
-      "id": "src_crypto_council_flow_main_rationale_900",
+      "id": "src_crypto_council_flow_main_rationale_902",
       "label": "Return the execution client used for the plan-fill step. Default (paper)\u2026",
       "_origin": "ast",
       "community": 58,
@@ -14202,7 +14224,7 @@
       "file_type": "rationale",
       "norm_label": "return the execution client used for the plan-fill step. default (paper)...",
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L900"
+      "source_location": "L902"
     },
     {
       "id": "src_crypto_council_flow_tools_execution_base_rationale_1",
@@ -14225,17 +14247,6 @@
       "norm_label": "raised by the factory when execution_mode=halted (kill switch).",
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
       "source_location": "L107"
-    },
-    {
-      "id": "src_crypto_council_flow_tools_execution_base_rationale_413",
-      "label": "Register a client factory under ``name`` (matched against EXECUTION_MODE for\u2026",
-      "_origin": "ast",
-      "community": 58,
-      "community_name": "ExecutionError",
-      "file_type": "rationale",
-      "norm_label": "register a client factory under ``name`` (matched against execution_mode for...",
-      "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L413"
     },
     {
       "id": "src_crypto_council_flow_tools_execution_base_rationale_423",
@@ -14280,17 +14291,6 @@
       "norm_label": "a normalized execution failure (network, rejected order, bad config). carries...",
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
       "source_location": "L94"
-    },
-    {
-      "id": "src_crypto_council_flow_tools_execution_paper_rationale_1",
-      "label": "Paper (simulated) execution client. The paper ledger predates the execution\u2026",
-      "_origin": "ast",
-      "community": 58,
-      "community_name": "ExecutionError",
-      "file_type": "rationale",
-      "norm_label": "paper (simulated) execution client. the paper ledger predates the execution...",
-      "source_file": "src/crypto_council_flow/tools/execution_paper.py",
-      "source_location": "L1"
     },
     {
       "id": "src_crypto_council_flow_tools_execution_base_py_basemodel",
@@ -14447,17 +14447,6 @@
       "source_location": "L218"
     },
     {
-      "id": "src_crypto_council_flow_tools_execution_base_rationale_351",
-      "label": "Submit an order. Raises ``ExecutionError`` on rejection/failure.\u2026",
-      "_origin": "ast",
-      "community": 61,
-      "community_name": "OrderResult",
-      "file_type": "rationale",
-      "norm_label": "submit an order. raises ``executionerror`` on rejection/failure....",
-      "source_file": "src/crypto_council_flow/tools/execution_base.py",
-      "source_location": "L351"
-    },
-    {
       "id": "src_crypto_council_flow_tools_execution_base_rationale_360",
       "label": "Cancel a live order and return its terminal state.",
       "_origin": "ast",
@@ -14467,6 +14456,17 @@
       "norm_label": "cancel a live order and return its terminal state.",
       "source_file": "src/crypto_council_flow/tools/execution_base.py",
       "source_location": "L360"
+    },
+    {
+      "id": "src_crypto_council_flow_tools_execution_base_rationale_369",
+      "label": "List live (unfilled/partially filled) orders.",
+      "_origin": "ast",
+      "community": 61,
+      "community_name": "OrderResult",
+      "file_type": "rationale",
+      "norm_label": "list live (unfilled/partially filled) orders.",
+      "source_file": "src/crypto_council_flow/tools/execution_base.py",
+      "source_location": "L369"
     },
     {
       "id": "src_crypto_council_flow_tools_execution_paper_rationale_393",
@@ -14623,7 +14623,7 @@
       "source_location": "L108"
     },
     {
-      "id": "src_crypto_council_flow_tools_execution_nobitex_rationale_409",
+      "id": "src_crypto_council_flow_tools_execution_nobitex_rationale_411",
       "label": "Best-effort last trade price for a pair (used to size market buys).",
       "_origin": "ast",
       "community": 64,
@@ -14631,10 +14631,10 @@
       "file_type": "rationale",
       "norm_label": "best-effort last trade price for a pair (used to size market buys).",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L409"
+      "source_location": "L411"
     },
     {
-      "id": "src_crypto_council_flow_tools_execution_nobitex_rationale_426",
+      "id": "src_crypto_council_flow_tools_execution_nobitex_rationale_428",
       "label": "Translate a normalized ``OrderRequest`` into a Nobitex payload. Deterministic\u2026",
       "_origin": "ast",
       "community": 64,
@@ -14642,7 +14642,7 @@
       "file_type": "rationale",
       "norm_label": "translate a normalized ``orderrequest`` into a nobitex payload. deterministic...",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L426"
+      "source_location": "L428"
     },
     {
       "id": "tests_test_execution_nobitex",
@@ -15107,7 +15107,7 @@
       "source_location": "L516"
     },
     {
-      "id": "src_crypto_council_flow_main_rationale_1489",
+      "id": "src_crypto_council_flow_main_rationale_1491",
       "label": "Generate a flow diagram HTML file.",
       "_origin": "ast",
       "community": 9,
@@ -15115,7 +15115,7 @@
       "file_type": "rationale",
       "norm_label": "generate a flow diagram html file.",
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L1489"
+      "source_location": "L1491"
     },
     {
       "id": "src_crypto_council_flow_main_rationale_306",
@@ -16411,7 +16411,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L1260",
+      "source_location": "L1262",
       "weight": 1.0
     },
     {
@@ -16423,7 +16423,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L955",
+      "source_location": "L957",
       "weight": 1.0
     },
     {
@@ -16435,7 +16435,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L1125",
+      "source_location": "L1127",
       "weight": 1.0
     },
     {
@@ -16447,7 +16447,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L1139",
+      "source_location": "L1141",
       "weight": 1.0
     },
     {
@@ -16459,7 +16459,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L1148",
+      "source_location": "L1150",
       "weight": 1.0
     },
     {
@@ -16471,7 +16471,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L1148",
+      "source_location": "L1150",
       "weight": 1.0
     },
     {
@@ -16483,7 +16483,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L1239",
+      "source_location": "L1241",
       "weight": 1.0
     },
     {
@@ -16795,7 +16795,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L915",
+      "source_location": "L917",
       "weight": 1.0
     },
     {
@@ -16807,7 +16807,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L918",
+      "source_location": "L920",
       "weight": 1.0
     },
     {
@@ -16819,7 +16819,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L921",
+      "source_location": "L923",
       "weight": 1.0
     },
     {
@@ -16831,7 +16831,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L923",
+      "source_location": "L925",
       "weight": 1.0
     },
     {
@@ -16855,7 +16855,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L1472",
+      "source_location": "L1474",
       "weight": 1.0
     },
     {
@@ -16867,7 +16867,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L1475",
+      "source_location": "L1477",
       "weight": 1.0
     },
     {
@@ -16879,7 +16879,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L1490",
+      "source_location": "L1492",
       "weight": 1.0
     },
     {
@@ -16891,7 +16891,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L1373",
+      "source_location": "L1375",
       "weight": 1.0
     },
     {
@@ -16903,7 +16903,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L1432",
+      "source_location": "L1434",
       "weight": 1.0
     },
     {
@@ -16915,7 +16915,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L1456",
+      "source_location": "L1458",
       "weight": 1.0
     },
     {
@@ -16927,7 +16927,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L882",
+      "source_location": "L884",
       "weight": 1.0
     },
     {
@@ -17239,7 +17239,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L433",
+      "source_location": "L435",
       "weight": 1.0
     },
     {
@@ -17251,7 +17251,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L441",
+      "source_location": "L445",
       "weight": 1.0
     },
     {
@@ -17263,7 +17263,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L453",
+      "source_location": "L457",
       "weight": 1.0
     },
     {
@@ -17275,7 +17275,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L462",
+      "source_location": "L466",
       "weight": 1.0
     },
     {
@@ -17287,7 +17287,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L469",
+      "source_location": "L473",
       "weight": 1.0
     },
     {
@@ -17299,7 +17299,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L476",
+      "source_location": "L480",
       "weight": 1.0
     },
     {
@@ -17311,7 +17311,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L489",
+      "source_location": "L493",
       "weight": 1.0
     },
     {
@@ -17323,7 +17323,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L571",
+      "source_location": "L582",
       "weight": 1.0
     },
     {
@@ -17335,7 +17335,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L577",
+      "source_location": "L589",
       "weight": 1.0
     },
     {
@@ -17347,7 +17347,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L582",
+      "source_location": "L594",
       "weight": 1.0
     },
     {
@@ -17359,7 +17359,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L320",
+      "source_location": "L322",
       "weight": 1.0
     },
     {
@@ -17371,7 +17371,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L530",
+      "source_location": "L541",
       "weight": 1.0
     },
     {
@@ -17383,7 +17383,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L538",
+      "source_location": "L549",
       "weight": 1.0
     },
     {
@@ -17395,7 +17395,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L542",
+      "source_location": "L553",
       "weight": 1.0
     },
     {
@@ -17407,36 +17407,12 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L641",
+      "source_location": "L653",
       "weight": 1.0
     },
     {
       "source": "src_crypto_council_flow_tools_execution_nobitex_nobitexexecutionclient_get_fills",
       "target": "src_crypto_council_flow_tools_execution_nobitex_nobitexexecutionclient_get",
-      "relation": "calls",
-      "_origin": "ast",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "context": "call",
-      "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L649",
-      "weight": 1.0
-    },
-    {
-      "source": "src_crypto_council_flow_tools_execution_nobitex_nobitexexecutionclient_get_fills",
-      "target": "src_crypto_council_flow_tools_execution_nobitex_iso_to_epoch_ms",
-      "relation": "calls",
-      "_origin": "ast",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "context": "call",
-      "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L654",
-      "weight": 1.0
-    },
-    {
-      "source": "src_crypto_council_flow_tools_execution_nobitex_nobitexexecutionclient_get_fills",
-      "target": "src_crypto_council_flow_tools_execution_base_fill",
       "relation": "calls",
       "_origin": "ast",
       "confidence": "EXTRACTED",
@@ -17448,7 +17424,7 @@
     },
     {
       "source": "src_crypto_council_flow_tools_execution_nobitex_nobitexexecutionclient_get_fills",
-      "target": "src_crypto_council_flow_tools_execution_nobitex_to_decimal",
+      "target": "src_crypto_council_flow_tools_execution_nobitex_iso_to_epoch_ms",
       "relation": "calls",
       "_origin": "ast",
       "confidence": "EXTRACTED",
@@ -17456,6 +17432,42 @@
       "context": "call",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
       "source_location": "L666",
+      "weight": 1.0
+    },
+    {
+      "source": "src_crypto_council_flow_tools_execution_nobitex_nobitexexecutionclient_get_fills",
+      "target": "src_crypto_council_flow_tools_execution_base_fill",
+      "relation": "calls",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "context": "call",
+      "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
+      "source_location": "L677",
+      "weight": 1.0
+    },
+    {
+      "source": "src_crypto_council_flow_tools_execution_nobitex_nobitexexecutionclient_get_fills",
+      "target": "src_crypto_council_flow_tools_execution_nobitex_to_decimal",
+      "relation": "calls",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "context": "call",
+      "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
+      "source_location": "L682",
+      "weight": 1.0
+    },
+    {
+      "source": "src_crypto_council_flow_tools_execution_nobitex_nobitexexecutionclient_get_fills",
+      "target": "src_crypto_council_flow_tools_execution_base_executionerror",
+      "relation": "calls",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "context": "call",
+      "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
+      "source_location": "L694",
       "weight": 1.0
     },
     {
@@ -17467,7 +17479,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L362",
+      "source_location": "L364",
       "weight": 1.0
     },
     {
@@ -17479,7 +17491,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L363",
+      "source_location": "L365",
       "weight": 1.0
     },
     {
@@ -17491,7 +17503,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L619",
+      "source_location": "L631",
       "weight": 1.0
     },
     {
@@ -17503,7 +17515,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L622",
+      "source_location": "L634",
       "weight": 1.0
     },
     {
@@ -17515,7 +17527,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L624",
+      "source_location": "L636",
       "weight": 1.0
     },
     {
@@ -17527,7 +17539,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L600",
+      "source_location": "L612",
       "weight": 1.0
     },
     {
@@ -17539,7 +17551,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L609",
+      "source_location": "L621",
       "weight": 1.0
     },
     {
@@ -17563,7 +17575,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L411",
+      "source_location": "L413",
       "weight": 1.0
     },
     {
@@ -17575,7 +17587,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L418",
+      "source_location": "L420",
       "weight": 1.0
     },
     {
@@ -17587,7 +17599,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L398",
+      "source_location": "L400",
       "weight": 1.0
     },
     {
@@ -17599,7 +17611,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L498",
+      "source_location": "L502",
       "weight": 1.0
     },
     {
@@ -17611,7 +17623,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L501",
+      "source_location": "L505",
       "weight": 1.0
     },
     {
@@ -17623,7 +17635,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L503",
+      "source_location": "L514",
       "weight": 1.0
     },
     {
@@ -17635,7 +17647,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L518",
+      "source_location": "L529",
       "weight": 1.0
     },
     {
@@ -17647,7 +17659,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L553",
+      "source_location": "L564",
       "weight": 1.0
     },
     {
@@ -17659,7 +17671,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L554",
+      "source_location": "L565",
       "weight": 1.0
     },
     {
@@ -17671,7 +17683,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L557",
+      "source_location": "L568",
       "weight": 1.0
     },
     {
@@ -17683,7 +17695,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L562",
+      "source_location": "L573",
       "weight": 1.0
     },
     {
@@ -17695,7 +17707,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L312",
+      "source_location": "L314",
       "weight": 1.0
     },
     {
@@ -17707,7 +17719,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L247",
+      "source_location": "L249",
       "weight": 1.0
     },
     {
@@ -17719,7 +17731,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L339",
+      "source_location": "L341",
       "weight": 1.0
     },
     {
@@ -17731,7 +17743,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L352",
+      "source_location": "L354",
       "weight": 1.0
     },
     {
@@ -17743,7 +17755,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L349",
+      "source_location": "L351",
       "weight": 1.0
     },
     {
@@ -22195,7 +22207,7 @@
       "confidence_score": 1.0,
       "context": "generic_arg",
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L1022",
+      "source_location": "L1024",
       "weight": 1.0
     },
     {
@@ -22207,7 +22219,7 @@
       "confidence_score": 1.0,
       "context": "generic_arg",
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L981",
+      "source_location": "L983",
       "weight": 1.0
     },
     {
@@ -22219,7 +22231,7 @@
       "confidence_score": 1.0,
       "context": "generic_arg",
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L1101",
+      "source_location": "L1103",
       "weight": 1.0
     },
     {
@@ -22243,7 +22255,7 @@
       "confidence_score": 1.0,
       "context": "generic_arg",
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L1181",
+      "source_location": "L1183",
       "weight": 1.0
     },
     {
@@ -22255,7 +22267,7 @@
       "confidence_score": 1.0,
       "context": "generic_arg",
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L1273",
+      "source_location": "L1275",
       "weight": 1.0
     },
     {
@@ -22267,7 +22279,7 @@
       "confidence_score": 1.0,
       "context": "generic_arg",
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L1157",
+      "source_location": "L1159",
       "weight": 1.0
     },
     {
@@ -22387,7 +22399,7 @@
       "confidence_score": 1.0,
       "context": "generic_arg",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L425",
+      "source_location": "L427",
       "weight": 1.0
     },
     {
@@ -22399,7 +22411,7 @@
       "confidence_score": 1.0,
       "context": "generic_arg",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L354",
+      "source_location": "L356",
       "weight": 1.0
     },
     {
@@ -22411,7 +22423,7 @@
       "confidence_score": 1.0,
       "context": "generic_arg",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L611",
+      "source_location": "L623",
       "weight": 1.0
     },
     {
@@ -22423,7 +22435,7 @@
       "confidence_score": 1.0,
       "context": "generic_arg",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L495",
+      "source_location": "L499",
       "weight": 1.0
     },
     {
@@ -22987,7 +22999,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L909",
+      "source_location": "L911",
       "weight": 1.0
     },
     {
@@ -22999,7 +23011,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L909",
+      "source_location": "L911",
       "weight": 1.0
     },
     {
@@ -23011,7 +23023,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L916",
+      "source_location": "L918",
       "weight": 1.0
     },
     {
@@ -24055,7 +24067,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L1249",
+      "source_location": "L1251",
       "weight": 1.0
     },
     {
@@ -24067,7 +24079,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L1022",
+      "source_location": "L1024",
       "weight": 1.0
     },
     {
@@ -24079,7 +24091,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L1233",
+      "source_location": "L1235",
       "weight": 1.0
     },
     {
@@ -24151,7 +24163,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L425",
+      "source_location": "L427",
       "weight": 1.0
     },
     {
@@ -24175,7 +24187,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L545",
+      "source_location": "L556",
       "weight": 1.0
     },
     {
@@ -24547,7 +24559,7 @@
       "confidence_score": 1.0,
       "context": "return_type",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L319",
+      "source_location": "L321",
       "weight": 1.0
     },
     {
@@ -24559,7 +24571,7 @@
       "confidence_score": 1.0,
       "context": "return_type",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L584",
+      "source_location": "L596",
       "weight": 1.0
     },
     {
@@ -24571,7 +24583,7 @@
       "confidence_score": 1.0,
       "context": "return_type",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L408",
+      "source_location": "L410",
       "weight": 1.0
     },
     {
@@ -24583,7 +24595,7 @@
       "confidence_score": 1.0,
       "context": "return_type",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L545",
+      "source_location": "L556",
       "weight": 1.0
     },
     {
@@ -24595,7 +24607,7 @@
       "confidence_score": 1.0,
       "context": "return_type",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L311",
+      "source_location": "L313",
       "weight": 1.0
     },
     {
@@ -24607,7 +24619,7 @@
       "confidence_score": 1.0,
       "context": "return_type",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L220",
+      "source_location": "L222",
       "weight": 1.0
     },
     {
@@ -24619,7 +24631,7 @@
       "confidence_score": 1.0,
       "context": "return_type",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L351",
+      "source_location": "L353",
       "weight": 1.0
     },
     {
@@ -24631,7 +24643,7 @@
       "confidence_score": 1.0,
       "context": "return_type",
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L347",
+      "source_location": "L349",
       "weight": 1.0
     },
     {
@@ -28174,7 +28186,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L1022",
+      "source_location": "L1024",
       "weight": 1.0
     },
     {
@@ -28185,7 +28197,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L1065",
+      "source_location": "L1067",
       "weight": 1.0
     },
     {
@@ -28196,7 +28208,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L1075",
+      "source_location": "L1077",
       "weight": 1.0
     },
     {
@@ -28207,7 +28219,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L1083",
+      "source_location": "L1085",
       "weight": 1.0
     },
     {
@@ -28218,7 +28230,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L1101",
+      "source_location": "L1103",
       "weight": 1.0
     },
     {
@@ -28240,7 +28252,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L1157",
+      "source_location": "L1159",
       "weight": 1.0
     },
     {
@@ -28251,7 +28263,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L1181",
+      "source_location": "L1183",
       "weight": 1.0
     },
     {
@@ -28262,7 +28274,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L1210",
+      "source_location": "L1212",
       "weight": 1.0
     },
     {
@@ -28273,7 +28285,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L1233",
+      "source_location": "L1235",
       "weight": 1.0
     },
     {
@@ -28284,7 +28296,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L1249",
+      "source_location": "L1251",
       "weight": 1.0
     },
     {
@@ -28295,7 +28307,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L1273",
+      "source_location": "L1275",
       "weight": 1.0
     },
     {
@@ -28306,7 +28318,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L1349",
+      "source_location": "L1351",
       "weight": 1.0
     },
     {
@@ -28317,7 +28329,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L1470",
+      "source_location": "L1472",
       "weight": 1.0
     },
     {
@@ -28328,7 +28340,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L1488",
+      "source_location": "L1490",
       "weight": 1.0
     },
     {
@@ -28449,7 +28461,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L899",
+      "source_location": "L901",
       "weight": 1.0
     },
     {
@@ -28460,7 +28472,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L926",
+      "source_location": "L928",
       "weight": 1.0
     },
     {
@@ -28471,7 +28483,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L931",
+      "source_location": "L933",
       "weight": 1.0
     },
     {
@@ -28482,7 +28494,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L945",
+      "source_location": "L947",
       "weight": 1.0
     },
     {
@@ -28493,7 +28505,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L981",
+      "source_location": "L983",
       "weight": 1.0
     },
     {
@@ -33465,7 +33477,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L220",
+      "source_location": "L222",
       "weight": 1.0
     },
     {
@@ -33476,7 +33488,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L311",
+      "source_location": "L313",
       "weight": 1.0
     },
     {
@@ -33487,7 +33499,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L319",
+      "source_location": "L321",
       "weight": 1.0
     },
     {
@@ -33498,7 +33510,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L322",
+      "source_location": "L324",
       "weight": 1.0
     },
     {
@@ -33509,7 +33521,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L330",
+      "source_location": "L332",
       "weight": 1.0
     },
     {
@@ -33520,7 +33532,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L347",
+      "source_location": "L349",
       "weight": 1.0
     },
     {
@@ -33531,7 +33543,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L351",
+      "source_location": "L353",
       "weight": 1.0
     },
     {
@@ -33542,7 +33554,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L354",
+      "source_location": "L356",
       "weight": 1.0
     },
     {
@@ -33553,7 +33565,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L375",
+      "source_location": "L377",
       "weight": 1.0
     },
     {
@@ -33564,7 +33576,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L408",
+      "source_location": "L410",
       "weight": 1.0
     },
     {
@@ -33575,7 +33587,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L425",
+      "source_location": "L427",
       "weight": 1.0
     },
     {
@@ -33586,7 +33598,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L495",
+      "source_location": "L499",
       "weight": 1.0
     },
     {
@@ -33597,7 +33609,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L523",
+      "source_location": "L534",
       "weight": 1.0
     },
     {
@@ -33608,7 +33620,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L545",
+      "source_location": "L556",
       "weight": 1.0
     },
     {
@@ -33619,7 +33631,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L564",
+      "source_location": "L575",
       "weight": 1.0
     },
     {
@@ -33630,7 +33642,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L584",
+      "source_location": "L596",
       "weight": 1.0
     },
     {
@@ -33641,7 +33653,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L611",
+      "source_location": "L623",
       "weight": 1.0
     },
     {
@@ -33652,7 +33664,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L629",
+      "source_location": "L641",
       "weight": 1.0
     },
     {
@@ -35790,58 +35802,47 @@
       "weight": 1.0
     },
     {
-      "source": "src_crypto_council_flow_main_rationale_1028",
+      "source": "src_crypto_council_flow_main_rationale_1030",
       "target": "src_crypto_council_flow_main_apply_max_hold",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L1028",
+      "source_location": "L1030",
       "weight": 1.0
     },
     {
-      "source": "src_crypto_council_flow_main_rationale_1076",
+      "source": "src_crypto_council_flow_main_rationale_1078",
       "target": "src_crypto_council_flow_main_within_pct_tolerance",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L1076",
+      "source_location": "L1078",
       "weight": 1.0
     },
     {
-      "source": "src_crypto_council_flow_main_rationale_1086",
+      "source": "src_crypto_council_flow_main_rationale_1088",
       "target": "src_crypto_council_flow_main_sane_levels",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L1086",
+      "source_location": "L1088",
       "weight": 1.0
     },
     {
-      "source": "src_crypto_council_flow_main_rationale_1104",
+      "source": "src_crypto_council_flow_main_rationale_1106",
       "target": "src_crypto_council_flow_main_backfill_risk_levels",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L1104",
-      "weight": 1.0
-    },
-    {
-      "source": "src_crypto_council_flow_main_rationale_1158",
-      "target": "src_crypto_council_flow_main_recompute_portfolio_totals",
-      "relation": "rationale_for",
-      "_origin": "ast",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L1158",
+      "source_location": "L1106",
       "weight": 1.0
     },
     {
@@ -35856,91 +35857,102 @@
       "weight": 1.0
     },
     {
-      "source": "src_crypto_council_flow_main_rationale_1182",
+      "source": "src_crypto_council_flow_main_rationale_1160",
+      "target": "src_crypto_council_flow_main_recompute_portfolio_totals",
+      "relation": "rationale_for",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/crypto_council_flow/main.py",
+      "source_location": "L1160",
+      "weight": 1.0
+    },
+    {
+      "source": "src_crypto_council_flow_main_rationale_1184",
       "target": "src_crypto_council_flow_main_extract_scout_items",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L1182",
+      "source_location": "L1184",
       "weight": 1.0
     },
     {
-      "source": "src_crypto_council_flow_main_rationale_1211",
+      "source": "src_crypto_council_flow_main_rationale_1213",
       "target": "src_crypto_council_flow_main_extract_verdict",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L1211",
+      "source_location": "L1213",
       "weight": 1.0
     },
     {
-      "source": "src_crypto_council_flow_main_rationale_1234",
+      "source": "src_crypto_council_flow_main_rationale_1236",
       "target": "src_crypto_council_flow_main_build_report",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L1234",
+      "source_location": "L1236",
       "weight": 1.0
     },
     {
-      "source": "src_crypto_council_flow_main_rationale_1253",
+      "source": "src_crypto_council_flow_main_rationale_1255",
       "target": "src_crypto_council_flow_main_append_to_consolidated",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L1253",
+      "source_location": "L1255",
       "weight": 1.0
     },
     {
-      "source": "src_crypto_council_flow_main_rationale_1274",
+      "source": "src_crypto_council_flow_main_rationale_1276",
       "target": "src_crypto_council_flow_main_parse_inputs",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L1274",
+      "source_location": "L1276",
       "weight": 1.0
     },
     {
-      "source": "src_crypto_council_flow_main_rationale_1359",
+      "source": "src_crypto_council_flow_main_rationale_1361",
       "target": "src_crypto_council_flow_main_run_async",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L1359",
+      "source_location": "L1361",
       "weight": 1.0
     },
     {
-      "source": "src_crypto_council_flow_main_rationale_1471",
+      "source": "src_crypto_council_flow_main_rationale_1473",
       "target": "src_crypto_council_flow_main_kickoff",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L1471",
+      "source_location": "L1473",
       "weight": 1.0
     },
     {
-      "source": "src_crypto_council_flow_main_rationale_1489",
+      "source": "src_crypto_council_flow_main_rationale_1491",
       "target": "src_crypto_council_flow_main_plot",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L1489",
+      "source_location": "L1491",
       "weight": 1.0
     },
     {
@@ -36109,58 +36121,58 @@
       "weight": 1.0
     },
     {
-      "source": "src_crypto_council_flow_main_rationale_900",
+      "source": "src_crypto_council_flow_main_rationale_902",
       "target": "src_crypto_council_flow_main_execution_client_for_ledger",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L900",
+      "source_location": "L902",
       "weight": 1.0
     },
     {
-      "source": "src_crypto_council_flow_main_rationale_927",
+      "source": "src_crypto_council_flow_main_rationale_929",
       "target": "src_crypto_council_flow_main_base_currency_hint",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L927",
+      "source_location": "L929",
       "weight": 1.0
     },
     {
-      "source": "src_crypto_council_flow_main_rationale_932",
+      "source": "src_crypto_council_flow_main_rationale_934",
       "target": "src_crypto_council_flow_main_regenerate_portfolio_panel",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L932",
+      "source_location": "L934",
       "weight": 1.0
     },
     {
-      "source": "src_crypto_council_flow_main_rationale_946",
+      "source": "src_crypto_council_flow_main_rationale_948",
       "target": "src_crypto_council_flow_main_atr_snapshot_for",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L946",
+      "source_location": "L948",
       "weight": 1.0
     },
     {
-      "source": "src_crypto_council_flow_main_rationale_985",
+      "source": "src_crypto_council_flow_main_rationale_987",
       "target": "src_crypto_council_flow_main_apply_sl_tp_hits",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L985",
+      "source_location": "L987",
       "weight": 1.0
     },
     {
@@ -36549,146 +36561,146 @@
       "weight": 1.0
     },
     {
-      "source": "src_crypto_council_flow_tools_execution_nobitex_rationale_229",
+      "source": "src_crypto_council_flow_tools_execution_nobitex_rationale_231",
       "target": "src_crypto_council_flow_tools_execution_nobitex_nobitexexecutionclient_request",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L229",
+      "source_location": "L231",
       "weight": 1.0
     },
     {
-      "source": "src_crypto_council_flow_tools_execution_nobitex_rationale_331",
+      "source": "src_crypto_council_flow_tools_execution_nobitex_rationale_333",
       "target": "src_crypto_council_flow_tools_execution_nobitex_nobitexexecutionclient_resolve_pair",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L331",
+      "source_location": "L333",
       "weight": 1.0
     },
     {
-      "source": "src_crypto_council_flow_tools_execution_nobitex_rationale_355",
+      "source": "src_crypto_council_flow_tools_execution_nobitex_rationale_357",
       "target": "src_crypto_council_flow_tools_execution_nobitex_nobitexexecutionclient_get_market_constraints",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L355",
+      "source_location": "L357",
       "weight": 1.0
     },
     {
-      "source": "src_crypto_council_flow_tools_execution_nobitex_rationale_376",
+      "source": "src_crypto_council_flow_tools_execution_nobitex_rationale_378",
       "target": "src_crypto_council_flow_tools_execution_nobitex_nobitexexecutionclient_min_notional_for",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L376",
+      "source_location": "L378",
       "weight": 1.0
     },
     {
-      "source": "src_crypto_council_flow_tools_execution_nobitex_rationale_409",
+      "source": "src_crypto_council_flow_tools_execution_nobitex_rationale_411",
       "target": "src_crypto_council_flow_tools_execution_nobitex_nobitexexecutionclient_last_price",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L409",
+      "source_location": "L411",
       "weight": 1.0
     },
     {
-      "source": "src_crypto_council_flow_tools_execution_nobitex_rationale_426",
+      "source": "src_crypto_council_flow_tools_execution_nobitex_rationale_428",
       "target": "src_crypto_council_flow_tools_execution_nobitex_nobitexexecutionclient_build_order_payload",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L426",
+      "source_location": "L428",
       "weight": 1.0
     },
     {
-      "source": "src_crypto_council_flow_tools_execution_nobitex_rationale_496",
+      "source": "src_crypto_council_flow_tools_execution_nobitex_rationale_500",
       "target": "src_crypto_council_flow_tools_execution_nobitex_nobitexexecutionclient_order_to_result",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L496",
+      "source_location": "L500",
       "weight": 1.0
     },
     {
-      "source": "src_crypto_council_flow_tools_execution_nobitex_rationale_524",
+      "source": "src_crypto_council_flow_tools_execution_nobitex_rationale_535",
       "target": "src_crypto_council_flow_tools_execution_nobitex_nobitexexecutionclient_get_balances",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L524",
+      "source_location": "L535",
       "weight": 1.0
     },
     {
-      "source": "src_crypto_council_flow_tools_execution_nobitex_rationale_546",
+      "source": "src_crypto_council_flow_tools_execution_nobitex_rationale_557",
       "target": "src_crypto_council_flow_tools_execution_nobitex_nobitexexecutionclient_place_order",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L546",
+      "source_location": "L557",
       "weight": 1.0
     },
     {
-      "source": "src_crypto_council_flow_tools_execution_nobitex_rationale_565",
+      "source": "src_crypto_council_flow_tools_execution_nobitex_rationale_576",
       "target": "src_crypto_council_flow_tools_execution_nobitex_nobitexexecutionclient_cancel_order",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L565",
+      "source_location": "L576",
       "weight": 1.0
     },
     {
-      "source": "src_crypto_council_flow_tools_execution_nobitex_rationale_585",
+      "source": "src_crypto_council_flow_tools_execution_nobitex_rationale_597",
       "target": "src_crypto_council_flow_tools_execution_nobitex_nobitexexecutionclient_get_order",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L585",
+      "source_location": "L597",
       "weight": 1.0
     },
     {
-      "source": "src_crypto_council_flow_tools_execution_nobitex_rationale_612",
+      "source": "src_crypto_council_flow_tools_execution_nobitex_rationale_624",
       "target": "src_crypto_council_flow_tools_execution_nobitex_nobitexexecutionclient_get_open_orders",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L612",
+      "source_location": "L624",
       "weight": 1.0
     },
     {
-      "source": "src_crypto_council_flow_tools_execution_nobitex_rationale_632",
+      "source": "src_crypto_council_flow_tools_execution_nobitex_rationale_644",
       "target": "src_crypto_council_flow_tools_execution_nobitex_nobitexexecutionclient_get_fills",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L632",
+      "source_location": "L644",
       "weight": 1.0
     },
     {
@@ -39120,7 +39132,7 @@
       "confidence_score": 0.85,
       "context": "getattr",
       "source_file": "src/crypto_council_flow/main.py",
-      "source_location": "L883",
+      "source_location": "L885",
       "weight": 1.0
     },
     {
@@ -39153,7 +39165,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.95,
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L247",
+      "source_location": "L249",
       "weight": 0.8
     },
     {
@@ -39164,7 +39176,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.95,
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L425",
+      "source_location": "L427",
       "weight": 0.8
     },
     {
@@ -39175,7 +39187,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.95,
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L439",
+      "source_location": "L443",
       "weight": 0.8
     },
     {
@@ -39186,7 +39198,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.95,
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L495",
+      "source_location": "L499",
       "weight": 0.8
     },
     {
@@ -39197,7 +39209,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.95,
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L507",
+      "source_location": "L508",
       "weight": 0.8
     },
     {
@@ -39208,7 +39220,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.95,
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L509",
+      "source_location": "L520",
       "weight": 0.8
     },
     {
@@ -39219,7 +39231,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.95,
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L523",
+      "source_location": "L534",
       "weight": 0.8
     },
     {
@@ -39230,7 +39242,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.95,
       "source_file": "src/crypto_council_flow/tools/execution_nobitex.py",
-      "source_location": "L631",
+      "source_location": "L643",
       "weight": 0.8
     },
     {

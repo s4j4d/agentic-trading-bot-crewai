@@ -6,9 +6,9 @@
     "semantic_hash": ""
   },
   "scripts/portfolio_panel.py": {
-    "mtime": 1791382694.8718612,
-    "seen": 1791382753.0093045,
-    "ast_hash": "bf1a6f0c61379c6e3799f87f6f68e6d7",
+    "mtime": 1791552907.570135,
+    "seen": 1791553363.7237234,
+    "ast_hash": "029a4a498a8e678421deadfaed09a360",
     "semantic_hash": ""
   },
   "src/crypto_council_flow/__init__.py": {
@@ -24,15 +24,15 @@
     "semantic_hash": ""
   },
   "src/crypto_council_flow/crews/council/council_crew.py": {
-    "mtime": 1791268948.4063706,
-    "seen": 1791269388.908443,
-    "ast_hash": "14b38de42bf760dd06381700fbe96b4a",
+    "mtime": 1791792173.8606703,
+    "seen": 1792131364.6843767,
+    "ast_hash": "77290a94bcc9c7f74482bf7cdaf02413",
     "semantic_hash": ""
   },
   "src/crypto_council_flow/main.py": {
-    "mtime": 1791475629.6876297,
-    "seen": 1791475675.7708235,
-    "ast_hash": "65e86bb79eaab0f35a3bfbeb5fb49b41",
+    "mtime": 1791663976.040665,
+    "seen": 1791700483.4434376,
+    "ast_hash": "d05e2bd52403c4f18f9f7e5b8a23bd29",
     "semantic_hash": ""
   },
   "src/crypto_council_flow/tools/__init__.py": {
@@ -84,15 +84,15 @@
     "semantic_hash": ""
   },
   "tests/conftest.py": {
-    "mtime": 1791016678.097093,
-    "seen": 1791033252.209287,
-    "ast_hash": "86d585e02e3db6a51fbe35befcde6525",
+    "mtime": 1792133080.6798122,
+    "seen": 1792133154.7910259,
+    "ast_hash": "3b780a3c2ebae2ca3497802eeb948d50",
     "semantic_hash": ""
   },
   "tests/test_crew_configs.py": {
-    "mtime": 1791212285.08368,
-    "seen": 1791212422.885673,
-    "ast_hash": "941b2f064183239bf7b894b15cfbc93f",
+    "mtime": 1791792520.4824996,
+    "seen": 1792131364.6843767,
+    "ast_hash": "aa3ff4b55490386f5b5d3d5191e042d8",
     "semantic_hash": ""
   },
   "tests/test_cycle_lock.py": {
@@ -120,9 +120,9 @@
     "semantic_hash": ""
   },
   "tests/test_portfolio.py": {
-    "mtime": 1791030837.2227337,
-    "seen": 1791033252.209287,
-    "ast_hash": "420382f791b873d75e329edc8ddf4f3d",
+    "mtime": 1791662517.3558147,
+    "seen": 1791700483.4434376,
+    "ast_hash": "1b5fb4477723b014b4634e8d1a771b53",
     "semantic_hash": ""
   },
   "tests/test_scout_parse.py": {
@@ -300,9 +300,9 @@
     "semantic_hash": ""
   },
   "src/crypto_council_flow/tools/execution_base.py": {
-    "mtime": 1791464741.6336646,
-    "seen": 1791464867.152451,
-    "ast_hash": "79ea74808c8a470082c30baa646679ae",
+    "mtime": 1791491561.0664604,
+    "seen": 1791538148.1337986,
+    "ast_hash": "dd5ee2593b636b5def80613a6660acb2",
     "semantic_hash": ""
   },
   "tests/test_execution_base.py": {
@@ -324,15 +324,75 @@
     "semantic_hash": ""
   },
   "src/crypto_council_flow/tools/execution_nobitex.py": {
-    "mtime": 1791475598.9328465,
-    "seen": 1791475675.7708235,
-    "ast_hash": "f2515248419dca777a15cb882c99755b",
+    "mtime": 1792131172.2928731,
+    "seen": 1792131364.6843767,
+    "ast_hash": "74d058aa984059e8fd1931cb7a97ebab",
     "semantic_hash": ""
   },
   "tests/test_execution_nobitex.py": {
-    "mtime": 1791474239.8187368,
-    "seen": 1791474303.8381221,
-    "ast_hash": "cd83c495d3543b3f1fc815286fdf0370",
+    "mtime": 1792133024.1913903,
+    "seen": 1792133154.7910259,
+    "ast_hash": "b4c401015cf35a271cab162983f00e62",
+    "semantic_hash": ""
+  },
+  "tests/test_execution_live_apply.py": {
+    "mtime": 1791624471.7509353,
+    "seen": 1791624580.0768604,
+    "ast_hash": "000307881e54e2b03d724402c0817a25",
+    "semantic_hash": ""
+  },
+  "tests/test_execution_reconcile.py": {
+    "mtime": 1791623726.7645617,
+    "seen": 1791624580.0768604,
+    "ast_hash": "c8afc7f66668d7e65d27bc23e6398093",
+    "semantic_hash": ""
+  },
+  "tests/test_reconcile_live_wiring.py": {
+    "mtime": 1791624333.8732708,
+    "seen": 1791624580.0768604,
+    "ast_hash": "888a6d3141319f08d37b9cefa8bcb68f",
+    "semantic_hash": ""
+  },
+  "tests/test_portfolio_panel_live.py": {
+    "mtime": 1791553078.2777936,
+    "seen": 1791553363.7237234,
+    "ast_hash": "f50ab81ce24f79c667b95d20af747580",
+    "semantic_hash": ""
+  },
+  "docs/execution-plan.md": {
+    "mtime": 1791701463.5025935,
+    "seen": 1791701483.3832402,
+    "ast_hash": "ee10396dcade6a4c1c431818c39ae6a7",
+    "semantic_hash": ""
+  },
+  "src/crypto_council_flow/tools/execution_safety.py": {
+    "mtime": 1791623118.0604527,
+    "seen": 1791624580.0768604,
+    "ast_hash": "17d31d011b93c2ae9d3ff8d7371013db",
+    "semantic_hash": ""
+  },
+  "tests/test_execution_live_safety.py": {
+    "mtime": 1791623613.822201,
+    "seen": 1791624580.0768604,
+    "ast_hash": "cf3a12331bf71920df1a5f93b865d49d",
+    "semantic_hash": ""
+  },
+  "tests/test_execution_safety.py": {
+    "mtime": 1791623299.8393688,
+    "seen": 1791624580.0768604,
+    "ast_hash": "df0a23a8e7eb379a25383dbfedbfa5f6",
+    "semantic_hash": ""
+  },
+  "scripts/rollout_diff.py": {
+    "mtime": 1791701218.1032965,
+    "seen": 1791701483.3827345,
+    "ast_hash": "e7d493b811f97c36297672b757b26f3d",
+    "semantic_hash": ""
+  },
+  "tests/test_rollout_diff.py": {
+    "mtime": 1791701336.5351326,
+    "seen": 1791701483.3832402,
+    "ast_hash": "91432b3b6be7c9b471838ebc68c86eb5",
     "semantic_hash": ""
   }
 }

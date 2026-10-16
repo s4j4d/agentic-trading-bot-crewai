@@ -1,11 +1,11 @@
 # Graph Report - crypto_council_flow  (2026-10-08)
 
 ## Corpus Check
-- 52 files · ~68,373 words
+- 52 files · ~68,519 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 1280 nodes · 2215 edges · 67 communities (65 shown, 1 thin omitted)
+- 1280 nodes · 2216 edges · 67 communities (65 shown, 1 thin omitted)
 - Extraction: 92% EXTRACTED · 8% INFERRED · 0% AMBIGUOUS · INFERRED: 180 edges (avg confidence: 0.91)
 - Token cost: 0 input · 0 output
 
@@ -90,7 +90,7 @@
 5. `PaperExecutionClient` - 26 edges
 6. `AGENTS.md — CrewAI Reference for AI Coding Assistants` - 25 edges
 7. `CoinOpportunity` - 24 edges
-8. `ExecutionError` - 23 edges
+8. `ExecutionError` - 24 edges
 9. `ExecutionClient` - 23 edges
 10. `_run()` - 21 edges
 
@@ -296,8 +296,8 @@ Cohesion: 0.10
 Nodes (22): _load_panel(), panel(), fixture, parametrize, Tests for the portfolio panel chart (scripts/portfolio_panel.py). Covers the…, Regression: `or account` made a genuine equity of 0.0 fall back to the full…, Regression: pre-ledger rows plotted account_size in the chart but 0 in the…, Regression: with a 60-row window the baseline silently re-based to hist[0]; it… (+14 more)
 
 ### Community 48 - "PaperExecutionClient"
-Cohesion: 0.17
-Nodes (10): _iso_to_epoch_ms(), PaperExecutionClient, Any, Fill the plan against the paper ledger using current prices. Prices come from…, Resolve a price from the last snapshot by an EXPLICIT coin_id match. The paper…, Simulated balances: coin quantities plus quote-currency cash. Cash is…, Simulate an immediate full fill at the last snapshot price. Paper has no order…, Map ledger rows to ``Fill`` objects (newest last). ``since`` is an epoch-ms… (+2 more)
+Cohesion: 0.11
+Nodes (17): _ClientFactory, OrderStatus, Register a client factory under ``name`` (matched against EXECUTION_MODE for…, register_execution_client(), _fee_bps_from_env(), _iso_to_epoch_ms(), PaperExecutionClient, Any (+9 more)
 
 ### Community 49 - "test_paper_ledger_pnl.py"
 Cohesion: 0.10
@@ -321,7 +321,7 @@ Nodes (12): kickoff(), _parse_inputs(), Parse CLI arguments into Flow inputs. Ac
 
 ### Community 54 - "ExecutionClient"
 Cohesion: 0.09
-Nodes (11): ExecutionClient, Any, Abstract base for order placement and account state on a venue. Concrete…, Return balances, optionally limited to ``assets`` (upper-case)., Return one order's current state, or None if the venue has no record of it…, List live (unfilled/partially filled) orders., Return executed trades, newest-last, optionally since an epoch-ms watermark.…, Return tick/lot/min-notional for a symbol when the venue exposes it. Default:… (+3 more)
+Nodes (11): ExecutionClient, Any, Abstract base for order placement and account state on a venue. Concrete…, Return balances, optionally limited to ``assets`` (upper-case)., Submit an order. Raises ``ExecutionError`` on rejection/failure.…, Return one order's current state, or None if the venue has no record of it…, Return executed trades, newest-last, optionally since an epoch-ms watermark.…, Return tick/lot/min-notional for a symbol when the venue exposes it. Default:… (+3 more)
 
 ### Community 55 - "_writer_body"
 Cohesion: 0.23
@@ -336,8 +336,8 @@ Cohesion: 0.12
 Nodes (17): _iso_to_epoch_ms(), NobitexExecutionClient, Any, Parse an ISO-8601 timestamp to epoch milliseconds (best effort)., Live spot execution on Nobitex (apiv2), token-authenticated. Configuration (all…, Call the venue, normalise every failure into ``ExecutionError``.…, Translate ``symbol`` into Nobitex's (srcCurrency, dstCurrency) pair. Accepts…, Local precision/min-notional for a symbol. Nobitex does not publish per-pair… (+9 more)
 
 ### Community 58 - "ExecutionError"
-Cohesion: 0.11
-Nodes (24): _ClientFactory, RuntimeError, _execution_client_for_ledger(), Return the execution client used for the plan-fill step. Default (paper)…, ExecutionError, ExecutionHalted, get_execution_client(), get_execution_mode() (+16 more)
+Cohesion: 0.16
+Nodes (17): RuntimeError, _execution_client_for_ledger(), Return the execution client used for the plan-fill step. Default (paper)…, ExecutionError, ExecutionHalted, get_execution_client(), get_execution_mode(), _load_builtin_clients() (+9 more)
 
 ### Community 59 - "Balance"
 Cohesion: 0.18
@@ -349,7 +349,7 @@ Nodes (4): _make_factory(), Tests for the abstract execution interface (tools/ex
 
 ### Community 61 - "OrderResult"
 Cohesion: 0.14
-Nodes (8): OrderResult, Normalized outcome of a placed/cancelled/queried order., Submit an order. Raises ``ExecutionError`` on rejection/failure.…, Cancel a live order and return its terminal state., Paper orders fill instantly, so nothing is ever live to cancel., Paper keeps no resting orders; nothing to look up., Paper never has resting orders (all fills are immediate)., TestOrderResult
+Nodes (8): OrderResult, Normalized outcome of a placed/cancelled/queried order., Cancel a live order and return its terminal state., List live (unfilled/partially filled) orders., Paper orders fill instantly, so nothing is ever live to cancel., Paper keeps no resting orders; nothing to look up., Paper never has resting orders (all fills are immediate)., TestOrderResult
 
 ### Community 62 - "CryptoCouncilState"
 Cohesion: 0.24
