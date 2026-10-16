@@ -121,6 +121,24 @@ def _memory_flag() -> bool:
 
 _USE_MEMORY = _memory_flag()
 
+
+def _env_int(name: str, default: int) -> int:
+    """Read an env knob as a positive int, falling back to ``default``.
+
+    Blank, non-numeric and non-positive values all fall back, so one bad
+    ``.env`` line can never crash an agent builder or disable a budget.
+    """
+    try:
+        value = int((os.getenv(name) or "").strip())
+    except (TypeError, ValueError, AttributeError):
+        return default
+    return value if value > 0 else default
+
+
+# Total wall-clock budget (seconds) for the market-scout agent. Env-tunable
+# because the right value depends on the model and network the operator runs.
+SCOUT_MAX_EXECUTION_TIME: int = _env_int("COUNCIL_SCOUT_MAX_EXECUTION_TIME", 500)
+
 _CONFIG_DIR = Path(__file__).parent / "config"
 _SKILLS_DIR = Path(__file__).parent / "skills"
 
@@ -307,7 +325,7 @@ class CouncilScoutCrew:
             max_iter=8,
             max_retry_limit=2,
             max_rpm=1,
-            max_execution_time=400
+            max_execution_time=SCOUT_MAX_EXECUTION_TIME
         )
 
     @task
