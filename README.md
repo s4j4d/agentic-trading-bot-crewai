@@ -1,10 +1,12 @@
 # Crypto Council Flow — agentic paper-trading council (CrewAI)
 
-A multi-agent crypto research + paper-portfolio pipeline built on [CrewAI Flows](https://docs.crewai.com).
-A council of specialist LLM agents scouts the market, analyses each candidate coin
-(technical → sentiment → risk), and reconciles everything into a cap-aware
-**paper** rebalance plan. For now it places no real orders — all positions are
-simulated on paper; live order execution is planned for the future.
+A multi-agent crypto research + **paper-portfolio** pipeline built on
+[CrewAI Flows](https://docs.crewai.com). A council of specialist LLM agents
+scouts the market, analyses each candidate coin (technical → sentiment →
+risk), and reconciles everything into a cap-aware rebalance plan. Paper mode
+is the default and every position is simulated on paper; a live execution
+layer (Nobitex) exists behind `EXECUTION_MODE` and is only reachable once
+credentials are configured — see [Execution modes](#execution-modes).
 
 > ⚠️ Not financial advice. Research/experimentation tooling only.
 
@@ -129,8 +131,65 @@ Useful flags for `--once`:
 
 ```bash
 python -m crypto_council_flow.main --once --account-size 5000000 --base-currency toman
-python -m crypto_council_flow.main --once --max-total-exposure 60 --max-single-position 20 --rsi-period 14 --atr-period 14
+python -m crypto_council_flow.main --once --max-total-exposure 30 --max-single-position 5
+python -m crypto_council_flow.main --once --rsi-period 14 --atr-period 14 --max-hold-days 1
 ```
+
+The default caps are deliberately small (30% total, 5% per coin) to keep
+single-cycle risk low. They are threaded through the flow into both the
+paper allocator and the live guard, so paper and live enforce the same caps.
+
+## Execution modes
+
+`EXECUTION_MODE` selects where rebalance plans are applied. The planner is
+identical in every mode; only the sink differs.
+
+| Mode | Behaviour |
+|---|---|
+| `paper` (**default**) | `PaperExecutionClient` simulates fills into `output/paper_ledger.json`. No network, no credentials needed. |
+| `live` | `NobitexExecutionClient` signs and posts real orders. Requires credentials — see below. |
+| `halted` | `ExecutionHalted` raises before any order is built or posted. Kill switch; the cycle continues on paper data instead of crashing. |
+
+Safety rails that apply to `live`:
+
+- **Exposure caps are enforced before an order is built** — sells and closes
+  are never capped, because reducing exposure can't increase it.
+- **Daily realised-loss breaker** fails closed: if realised P&L for the day
+  exceeds `EXECUTION_MAX_DAILY_LOSS_PCT` (default 5%) the day is halted.
+  `EXECUTION_DRY_RUN=true` bypasses the breaker for rehearsals.
+- **`EXECUTION_MIN_TRADE`** (default 10) is a dust floor — smaller deltas
+  become holds rather than orders. Set it to your venue's minimum.
+
+### Nobitex credentials
+
+Two authentication schemes are supported:
+
+| Scheme | Vars | Sends |
+|---|---|---|
+| Legacy v2 token | `EXCHANGE_API_KEY` (+ `EXECUTION_API_KEY`) | `Authorization: Token <key>` |
+| Ed25519 API key | `EXECUTION_API_KEY` + `EXECUTION_API_SECRET` | `Nobitex-Key` / `Nobitex-Signature` / `Nobitex-Timestamp` |
+
+The Ed25519 signature covers `timestamp + METHOD + full_path + raw_body`
+and is recomputed on every attempt, because each retry needs a fresh
+timestamp (the venue tolerates 30s of clock skew). The body is serialised
+once, so the signed bytes are exactly the bytes on the wire.
+
+Credentials are resolved as a **pair**: passing an API key without a secret
+means token auth even if a secret is present in the environment, so the
+auth mode never depends on ambient state.
+
+> **Use trade-only API keys with withdrawal permission disabled, an IP
+> allowlist, and secrets only in `.env` (never in code, tests, or logs).**
+
+### Rehearsing live mode
+
+```bash
+EXECUTION_MODE=live EXECUTION_DRY_RUN=true \
+  python -m crypto_council_flow.main --once --max-total-exposure 30 --max-single-position 5
+```
+
+Dry-run builds no POST and writes no log. Compare a dry-run/day against the
+paper record with `python scripts/rollout_diff.py`.
 
 ## Outputs (`output/`, git-ignored)
 
@@ -169,8 +228,16 @@ Console prints per-cycle timings (`⏱ Scout/Analysis/Portfolio`) and a
 | OHLC source | `USE_EXCHANGE_OHLC` env (`true` = exchange, `false` = CoinGecko) | `false` |
 | Sentiment news feeds | `CRYPTO_NEWS_SENTIMENT` env (comma-separated RSS URLs) | CoinTelegraph / CoinDesk / Decrypt |
 | NewsData provider key | `NEWSDATA_API_KEY` env | unset |
-| Exposure caps | `--max-total-exposure` / `--max-single-position` | 60% / 20% |
-| Exchange backend | `EXCHANGE*` env (`EXCHANGE`, `EXCHANGE_API_BASE`, `EXCHANGE_API_KEY`, `EXCHANGE_QUOTE`) | Nobitex apiv2, `rls` quote |
+| Exposure caps | `--max-total-exposure` / `--max-single-position` | 30% / 5% |
+| Live execution mode | `EXECUTION_MODE` env (`paper` / `live` / `halted`) | `paper` |
+| Daily realised-loss breaker | `EXECUTION_MAX_DAILY_LOSS_PCT` env | 5% |
+| Dust floor per rebalance | `EXECUTION_MIN_TRADE` env (base currency) | 10 |
+| Dry-run (build no POST, write no log) | `EXECUTION_DRY_RUN` env | `false` |
+| Exchange backend | `EXCHANGE*` env (`EXCHANGE`, `EXCHANGE_API_BASE`, `EXCHANGE_API_KEY`, `EXCHANGE_API_SECRET`, `EXCHANGE_QUOTE`) | Nobitex apiv2, `rls` quote |
+| Execution venue override | `EXECUTION_EXCHANGE` env | inherits `EXCHANGE` |
+| Live execution log | `EXECUTION_LOG_PATH` env | `output/live_executions.jsonl` |
+| Scout agent time budget | `COUNCIL_SCOUT_MAX_EXECUTION_TIME` env (seconds) | 500 |
+| Paper fee estimate | `PAPER_FEE_BPS` env | 0 |
 | CrewAI generic memory | `COUNCIL_MEMORY` env (`USE_MEMORY` legacy alias) | `false` (off; trade journal is separate) |
 | Volatility screener exchange filter | `require_exchange_listing` on `VolatilityScreenerTool` | `true` |
 
@@ -181,12 +248,21 @@ them without editing the file.
 ## Tests
 
 ```bash
-.venv/Scripts/python -m pytest tests/ -q
+.venv/Scripts/python -m pytest tests/ -q --ignore=tests/test_backtest_real_flow.py
 ```
 
-Covers DTO/model validation, crew config, cycle locking, portfolio
-allocator/exposure math, parallel-analysis merge + concurrency, scout parsing,
-and a 30-day backtest harness.
+`tests/test_backtest_real_flow.py` is excluded above because it hits live
+network endpoints; add it back deliberately when you mean to.
+
+Covers DTO/model validation, crew config, cycle locking, the portfolio
+allocator/exposure math, parallel-analysis merge + concurrency, scout
+parsing, the paper ledger's equity and P&L, the live safety guards, the
+Nobitex client (both auth schemes), the paper-vs-live differ, and a 30-day
+backtest harness.
+
+An autouse fixture in `tests/conftest.py` clears the four credential
+variables before every test, so ambient shell credentials can't change an
+auth-mode assertion.
 
 ## Layout
 
@@ -197,9 +273,23 @@ src/crypto_council_flow/
     council_crew.py        # 3 crews, 5 agents, canonical DTOs
     config/                # agents.jsonc, *_tasks.yaml, agents.yaml placeholder
     skills/                # SKILL.md per agent (market-scout, risk-manager, …)
-  tools/                   # scout / technical / sentiment / risk / exchange / portfolio
-scripts/portfolio_panel.py # HTML allocation panel (stdlib only)
+  tools/
+    execution_base.py      # ExecutionClient ABC: Balance/OrderRequest/Fill + factory
+    execution_paper.py     # PaperExecutionClient — simulated fills, no network
+    execution_nobitex.py   # NobitexExecutionClient — live; both auth schemes
+    execution_safety.py    # exposure caps, daily-loss breaker, SYMBOL→PAIR mapping
+    scout_tools.py         # screener / markets / trending tools
+    technical_indicators.py# RSI, MACD, Bollinger, EMA-cross, ATR (shared OHLC cache)
+    sentiment_tools.py     # fear & greed, news, community, dominance
+    risk_tools.py          # Kelly sizing, liquidation price, VaR, correlation
+    portfolio_tools.py     # exposure + deterministic rebalance allocator
+    exchange_base.py       # exchange-agnostic market-data ABC
+scripts/
+  portfolio_panel.py       # HTML allocation + P&L panel (stdlib only)
+  rollout_diff.py          # paper-vs-live artefact differ
 tests/                     # pytest suite
+docs/execution-plan.md     # paper → live phase plan
+graphify-out/              # generated knowledge graph (committed; `graphify update .`)
 .hermes/plans/             # design plans (e.g. sub-15-min flow plan)
 ```
 

@@ -1631,9 +1631,10 @@ def _parse_inputs(argv: list[str]) -> dict[str, Any]:
       --base-currency <str>    currency label (default: usd, e.g. toman, eur)
       --rsi-period <int>       RSI look-back in candles (default: 14)
       --atr-period <int>       ATR look-back in candles (default: 14)
-      --max-total-exposure <float>  max total invested % (default: 60)
-      --max-single-position <float> max single-coin % (default: 20)
+      --max-total-exposure <float>  max total invested % (default: 30)
+      --max-single-position <float> max single-coin % (default: 5)
       --once                   run one full cycle and exit
+      --max-hold-days <int>    deterministic max hold, days (default: 1)
     """
     inputs: dict[str, Any] = {
         "account_size": 10_000.0,
